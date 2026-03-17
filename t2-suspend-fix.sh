@@ -325,12 +325,12 @@ if set_kbd_brightness; then
 fi
 
 # Poll
-for i in $(seq 1 15); do
+for i in $(seq 1 30); do
     if set_kbd_brightness; then
         t2_log "kbd-bl" "OK: keyboard backlight set after $i/15 attempts"
         exit 0
     fi
-    sleep 1
+    sleep 0.5
 done
 
 t2_log "kbd-bl" "ERROR: could not set keyboard backlight after 15 attempts"
@@ -356,15 +356,15 @@ t2_log() {
     timestamp=$(date "+%Y_%m_%d-%H:%M:%S")
     echo "[${timestamp}][${label}] ${msg}" >> "$LOG_FILE" 2>/dev/null || true
 }
-t2_log "wait-bce" "Starting wait for apple_bce PCI binding..."
-for i in $(seq 1 15); do
-    if ls /sys/bus/pci/drivers/apple-bce/*:* >/dev/null 2>&1; then
-        t2_log "wait-bce" "OK: apple_bce PCI binding found (attempt $i/15)"
+t2_log "wait-bce" "Starting wait for appletbdrm in lsmod..."
+for i in $(seq 1 30); do
+    if lsmod | grep -q "^appletbdrm"; then
+        t2_log "wait-bce" "OK: appletbdrm found in lsmod (attempt $i/15)"
         exit 0
     fi
-    sleep 1
+    sleep 0.5
 done
-t2_log "wait-bce" "ERROR: apple_bce PCI binding not found after 15 attempts"
+t2_log "wait-bce" "ERROR: appletbdrm not found in lsmod after 15 attempts"
 exit 1
 EOF
 sudo chmod +x /usr/local/bin/t2-wait-apple-bce.sh
@@ -483,17 +483,27 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][suspend] $*" >> "$LOG_FILE" 2>/dev/null || true
 }
 
+unload_mod() {
+    local mod="$1"
+    t2_log "Unloading $mod..."
+    /usr/bin/rmmod "$mod" 2>/dev/null || true
+    lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
+}
+
+unload_mod_force() {
+    local mod="$1"
+    t2_log "Force unloading $mod..."
+    /usr/bin/rmmod -f "$mod" 2>/dev/null || true
+    lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
+}
+
 t2_log "Starting suspend sequence..."
 
 # Stop user services
-t2_log "Stopping user services (tiny-dfr, t2fanrd)..."
+t2_log "Stopping services..."
 /usr/bin/systemctl stop tiny-dfr 2>/dev/null || true
 /usr/bin/systemctl stop t2fanrd 2>/dev/null || true
-
-# Set pm_async for better suspend stability
-t2_log "Setting pm_async=0..."
-echo 0 > /sys/power/pm_async
-t2_log "OK: pm_async=0"
+t2_log "OK: Stopped services."
 
 # Backlight off
 t2_log "Turning off keyboard backlight..."
@@ -501,48 +511,26 @@ t2_log "Turning off keyboard backlight..."
 t2_log "OK: keyboard backlight off"
 
 # Stop audio
-t2_log "Stopping audio services..."
 /usr/local/bin/t2-stop-audio.sh
 
-# Block WiFi and Bluetooth
-t2_log "Blocking WiFi and Bluetooth..."
-/usr/bin/rfkill block wifi
-/usr/bin/rfkill block bluetooth
-t2_log "OK: WiFi/BT blocked"
-
-# Deactivate WiFi
-t2_log "Disabling WiFi radio..."
-/usr/bin/nmcli radio wifi off
-t2_log "OK: WiFi radio disabled"
-
 # Unload WiFi driver
-t2_log "Unloading brcmfmac driver..."
-/usr/sbin/modprobe -r brcmfmac_wcc 2>/dev/null || true
-/usr/sbin/modprobe -r brcmfmac 2>/dev/null || true
-lsmod | grep "^brcmfmac" >/dev/null && t2_log "ERROR: brcmfmac still loaded" || t2_log "OK: brcmfmac unloaded"
+unload_mod brcmfmac_wcc
+unload_mod brcmfmac
+unload_mod brcmutil
 
 # Unload Bluetooth driver
-t2_log "Unloading hci_bcm4377 driver..."
-/usr/sbin/modprobe -r hci_bcm4377 2>/dev/null || true
-lsmod | grep "^hci_bcm4377" >/dev/null && t2_log "ERROR: hci_bcm4377 still loaded" || t2_log "OK: hci_bcm4377 unloaded"
+unload_mod hci_bcm4377
 
-# Unload Touch Bar drivers (sparse_keymap depends on hid_appletb_kbd)
-t2_log "Unloading sparse_keymap..."
-/usr/sbin/modprobe -r sparse_keymap 2>/dev/null || true
-lsmod | grep "^sparse_keymap" >/dev/null && t2_log "ERROR: sparse_keymap still loaded" || t2_log "OK: sparse_keymap unloaded"
-
-t2_log "Unloading hid_appletb_kbd..."
-/usr/sbin/modprobe -r hid_appletb_kbd 2>/dev/null || true
-lsmod | grep "^hid_appletb_kbd" >/dev/null && t2_log "ERROR: hid_appletb_kbd still loaded" || t2_log "OK: hid_appletb_kbd unloaded"
-
-t2_log "Unloading hid_appletb_bl..."
-/usr/sbin/modprobe -r hid_appletb_bl 2>/dev/null || true
-lsmod | grep "^hid_appletb_bl" >/dev/null && t2_log "ERROR: hid_appletb_bl still loaded" || t2_log "OK: hid_appletb_bl unloaded"
+# Unload touchbar drivers
+unload_mod hid_appletb_bl
+unload_mod hid_appletb_kbd
+unload_mod appletbdrm
+unload_mod sparse_keymap
 
 # Apple BCE removal
-t2_log "Removing apple_bce module..."
-/usr/sbin/rmmod -f apple_bce 2>/dev/null || true
-lsmod | grep "^apple_bce" >/dev/null && t2_log "ERROR: apple_bce still loaded" || t2_log "OK: apple_bce removed"
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+unload_mod_force apple_bce
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 t2_log "Suspend complete, ready to sleep"
 SUSPEND_EOF
@@ -558,70 +546,42 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][resume] $*" >> "$LOG_FILE" 2>/dev/null || true
 }
 
+load_mod() {
+    local mod="$1"
+    t2_log "Loading $mod..."
+    /usr/bin/modprobe "$mod" 2>/dev/null || true
+    lsmod | grep "^${mod}" >/dev/null && t2_log "OK: $mod loaded" || t2_log "ERROR: $mod not loaded"
+}
+
 t2_log "Starting resume..."
 
 # Load apple_bce first (foundation for everything)
-t2_log "Loading apple_bce module..."
-/usr/sbin/modprobe apple_bce
-lsmod | grep "^apple_bce" >/dev/null && t2_log "OK: apple_bce module loaded" || t2_log "ERROR: failed to load apple_bce"
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+load_mod apple_bce
 
 # Wait for BCE PCI binding
-t2_log "Waiting for apple_bce PCI binding..."
 /usr/local/bin/t2-wait-apple-bce.sh
-
-# Rescan PCI bus (needs to happen before upower restart so it sees devices)
-t2_log "Running PCI bus rescan..."
-echo 1 > /sys/bus/pci/rescan
-t2_log "OK: PCI rescan complete"
-
-# Restore keyboard backlight (at end)
-t2_log "Restoring keyboard backlight..."
-/usr/local/bin/fix-kbd-backlight.sh
-
-# Restart UPower (now sees all re-appeared devices)
-t2_log "Restarting UPower service..."
-/usr/bin/systemctl restart upower
-t2_log "OK: UPower restarted"
-
-# Load WiFi driver
-t2_log "Loading brcmfmac driver..."
-/usr/sbin/modprobe brcmfmac 2>/dev/null || true
-/usr/sbin/modprobe brcmfmac_wcc 2>/dev/null || true
-lsmod | grep "^brcmfmac" >/dev/null && t2_log "OK: brcmfmac loaded" || t2_log "ERROR: brcmfmac not loaded"
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Load Bluetooth driver
-t2_log "Loading hci_bcm4377 driver..."
-/usr/sbin/modprobe hci_bcm4377 2>/dev/null || true
-lsmod | grep "^hci_bcm4377" >/dev/null && t2_log "OK: hci_bcm4377 loaded" || t2_log "ERROR: hci_bcm4377 not loaded"
+load_mod hci_bcm4377
 
-# Unblock WiFi and Bluetooth (after drivers loaded)
-t2_log "Unblocking WiFi and Bluetooth..."
-/usr/bin/rfkill unblock wifi
-/usr/bin/rfkill unblock bluetooth
-t2_log "OK: WiFi/BT unblocked"
+# Load WiFi driver
+load_mod brcmutil
+load_mod brcmfmac
+load_mod brcmfmac_wcc
 
-# Enable WiFi radio immediately after unblock (needs to be before audio)
-t2_log "Enabling WiFi radio..."
-/usr/bin/nmcli radio wifi on
-t2_log "OK: WiFi radio enabled"
-
-# Restart audio (needs apple_bce)
-t2_log "Starting audio services..."
+# Restart audio
 /usr/local/bin/t2-start-audio.sh
 
-# Smart WiFi check - wait up to 5s for driver to bind
-t2_log "Checking WiFi driver binding..."
-for i in $(seq 1 10); do
-    if ls /sys/bus/pci/drivers/brcmfmac/*:* >/dev/null 2>&1; then
-        t2_log "OK: WiFi driver bound (attempt $i/10)"
-        break
-    fi
-    sleep 0.5
-done
+# Restore keyboard backlight
+/usr/local/bin/fix-kbd-backlight.sh
 
 # Start user services
+t2_log "Starting services..."
 /usr/bin/systemctl start t2fanrd 2>/dev/null || true
-/usr/bin/systemctl start tiny-dfr 2>/dev/null || true
+# /usr/bin/systemctl start tiny-dfr 2>/dev/null || true
+t2_log "OK: Started services."
 
 t2_log "Resume complete"
 RESUME_EOF
