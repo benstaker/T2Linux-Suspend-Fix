@@ -497,13 +497,26 @@ unload_mod_force() {
     lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
 }
 
+stop_service() {
+    local svc="$1"
+    t2_log "Stopping $svc..."
+    systemctl stop "$svc" --no-block 2>/dev/null || true
+    for i in $(seq 1 20); do
+        if ! systemctl is-active "$svc" >/dev/null 2>&1; then
+            t2_log "OK: $svc stopped after $i/20 attempts"
+            return 0
+        fi
+        sleep 0.5
+    done
+    t2_log "ERROR: $svc stop timed out after 10s"
+    return 1
+}
+
 t2_log "Starting suspend sequence..."
 
 # Stop user services
-t2_log "Stopping services..."
-/usr/bin/systemctl stop tiny-dfr 2>/dev/null || true
-/usr/bin/systemctl stop t2fanrd 2>/dev/null || true
-t2_log "OK: Stopped services."
+stop_service tiny-dfr
+stop_service t2fanrd
 
 # Stop audio
 /usr/local/bin/t2-stop-audio.sh
@@ -553,6 +566,21 @@ load_mod() {
     lsmod | grep "^${mod}" >/dev/null && t2_log "OK: $mod loaded" || t2_log "ERROR: $mod not loaded"
 }
 
+start_service() {
+    local svc="$1"
+    t2_log "Starting $svc..."
+    systemctl start "$svc" --no-block 2>/dev/null || true
+    for i in $(seq 1 20); do
+        if systemctl is-active "$svc" >/dev/null 2>&1; then
+            t2_log "OK: $svc started after $i/20 attempts"
+            return 0
+        fi
+        sleep 0.5
+    done
+    t2_log "ERROR: $svc start timed out after 10s"
+    return 1
+}
+
 t2_log "Starting resume..."
 
 # Load apple_bce first (foundation for everything)
@@ -578,10 +606,8 @@ load_mod brcmfmac_wcc
 /usr/local/bin/t2-start-audio.sh
 
 # Start user services
-t2_log "Starting services..."
-/usr/bin/systemctl start t2fanrd 2>/dev/null || true
-# /usr/bin/systemctl start tiny-dfr 2>/dev/null || true
-t2_log "OK: Started services."
+start_service t2fanrd
+start_service tiny-dfr
 
 t2_log "Resume complete"
 RESUME_EOF
