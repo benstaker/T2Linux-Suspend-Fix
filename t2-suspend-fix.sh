@@ -505,13 +505,13 @@ t2_log "Stopping services..."
 /usr/bin/systemctl stop t2fanrd 2>/dev/null || true
 t2_log "OK: Stopped services."
 
+# Stop audio
+/usr/local/bin/t2-stop-audio.sh
+
 # Backlight off
 t2_log "Turning off keyboard backlight..."
 /usr/bin/brightnessctl -sd :white:kbd_backlight set 0 -q 2>/dev/null || true
 t2_log "OK: keyboard backlight off"
-
-# Stop audio
-/usr/local/bin/t2-stop-audio.sh
 
 # Unload WiFi driver
 unload_mod brcmfmac_wcc
@@ -571,11 +571,11 @@ load_mod brcmutil
 load_mod brcmfmac
 load_mod brcmfmac_wcc
 
-# Restart audio
-/usr/local/bin/t2-start-audio.sh
-
 # Restore keyboard backlight
 /usr/local/bin/fix-kbd-backlight.sh
+
+# Restart audio
+/usr/local/bin/t2-start-audio.sh
 
 # Start user services
 t2_log "Starting services..."
