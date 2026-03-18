@@ -483,6 +483,22 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][suspend] $*" >> "$LOG_FILE" 2>/dev/null || true
 }
 
+disable_dev_wakeup() {
+    local dev="$1"
+    [ -z "$dev" ] && return 1
+    local current
+    current=$(awk -v d="$dev" '$1==d {print $3}' /proc/acpi/wakeup)
+    case "$current" in
+        "*enabled"|"enabled")
+            echo "$dev" > /proc/acpi/wakeup
+            t2_log "Disabled wakeup for $dev"
+            ;;
+        "*disabled"|"disabled")
+            t2_log "Wakeup already disabled for $dev"
+            ;;
+    esac
+}
+
 unload_mod() {
     local mod="$1"
     t2_log "Unloading $mod..."
@@ -514,6 +530,23 @@ stop_service() {
 
 t2_log "Starting suspend sequence..."
 
+# Disable wakeup
+disable_dev_wakeup ADP1
+disable_dev_wakeup EC
+disable_dev_wakeup XHC1
+disable_dev_wakeup XHC2
+disable_dev_wakeup XHC3
+disable_dev_wakeup RP01
+disable_dev_wakeup RP17
+disable_dev_wakeup GFX0
+disable_dev_wakeup BLTH
+disable_dev_wakeup ARPT
+disable_dev_wakeup PEG0
+disable_dev_wakeup PEG1
+disable_dev_wakeup PEG2
+disable_dev_wakeup ARPT
+disable_dev_wakeup GPUC
+
 # Stop user services
 stop_service tiny-dfr
 stop_service t2fanrd
@@ -526,19 +559,29 @@ t2_log "Turning off keyboard backlight..."
 /usr/bin/brightnessctl -sd :white:kbd_backlight set 0 -q 2>/dev/null || true
 t2_log "OK: keyboard backlight off"
 
-# Unload WiFi driver
+# Unload WiFi / Bluetooth driver
 unload_mod brcmfmac_wcc
 unload_mod brcmfmac
 unload_mod brcmutil
 
 # Unload Bluetooth driver
-unload_mod hci_bcm4377
+# unload_mod hci_bcm4377
 
 # Unload touchbar drivers
 unload_mod hid_appletb_bl
 unload_mod hid_appletb_kbd
 unload_mod appletbdrm
 unload_mod sparse_keymap
+
+# Sensors
+unload_mod hid_sensor_als
+unload_mod hid_sensor_rotation
+unload_mod hid_sensor_trigger
+unload_mod hid_sensor_iio_common
+unload_mod hid_sensor_hub
+unload_mod industrialio_triggered_buffer
+unload_mod kfifo_buf
+unload_mod industrialio
 
 # Apple BCE removal
 # lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
@@ -587,17 +630,27 @@ t2_log "Starting resume..."
 # lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 load_mod apple_bce
 
-# Wait for BCE PCI binding
-/usr/local/bin/t2-wait-apple-bce.sh
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# Sensors
+load_mod industrialio
+load_mod industrialio_triggered_buffer
+load_mod kfifo_buf
+load_mod hid_sensor_hub
+load_mod hid_sensor_iio_common
+load_mod hid_sensor_trigger
+load_mod hid_sensor_rotation
+load_mod hid_sensor_als
 
 # Load Bluetooth driver
-load_mod hci_bcm4377
+# load_mod hci_bcm4377
 
-# Load WiFi driver
+# Load WiFi / Bluetooth driver
 load_mod brcmutil
 load_mod brcmfmac
 load_mod brcmfmac_wcc
+
+# Wait for BCE PCI binding
+/usr/local/bin/t2-wait-apple-bce.sh
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Restore keyboard backlight
 /usr/local/bin/fix-kbd-backlight.sh
