@@ -37,7 +37,6 @@ Forked and inspired by:
 ### Drivers:
 
 1. [NoaHimesaka1873/linux-t2-arch](https://github.com/NoaHimesaka1873/linux-t2-arch)
-2. [deqrocks/apple-bce-drv](https://github.com/deqrocks/apple-bce-drv)
 
 
 ### Configuration:
@@ -58,3 +57,4 @@ Forked and inspired by:
 1. If you force shutdown, you will need to boot into MacOS, then restart from the login screen and then boot back into linux. Otherwise some devices do not work.
 2. I have tried using `pcie_ports=native`, but this slows waking by a lot.
 3. I was unable to get [NoaHimesaka1873/tiny-dfr-arch](https://github.com/NoaHimesaka1873/tiny-dfr-arch) working just yet.
+4. Tried using [deqrocks/apple-bce-drv](https://github.com/deqrocks/apple-bce-drv), however this caused issues with the touchbar working after waking. 
