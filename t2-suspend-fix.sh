@@ -114,6 +114,7 @@ if [ "$MODE" = "uninstall" ]; then
     sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
     sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
     sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
+    sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
     sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
     sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
     sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
@@ -124,12 +125,16 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
     sudo rm -f /etc/systemd/system/resume-wifi-reload.service
     sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
+    sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
     sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
     sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
     sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
     sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
     sudo rm -f /usr/local/bin/t2-wait-brcmfmac.sh
     sudo rm -f /usr/local/bin/fix-kbd-backlight.sh
+    sudo rm -f /usr/local/bin/fix-gmux-backlight.sh
+    sudo rm -f /usr/local/bin/drm-display-off.sh
+    sudo rm -f /usr/local/bin/drm-display-on.sh
     sudo rm -f /usr/local/bin/enable-wakeup-devices.sh
     sudo rm -f /usr/local/bin/t2-stop-audio.sh
     sudo rm -f /usr/local/bin/t2-start-audio.sh
@@ -208,6 +213,7 @@ sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
 sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
 sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
 sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
+sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
 sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
 echo "  - Old services disabled."
 
@@ -215,6 +221,7 @@ echo "  - Removing old unit files..."
 sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
 sudo rm -f /etc/systemd/system/resume-wifi-reload.service
 sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
+sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
 sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
 sudo rm -f /etc/systemd/system/suspend-fix-t2.service
 sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
@@ -246,9 +253,8 @@ EOF
 
 sudo tee /usr/local/bin/enable-wakeup-devices.sh > /dev/null << 'EOF'
 #!/bin/sh
-LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][wakeup] $*" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][wakeup] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
 t2_log "Starting enable wakeup devices..."
 enabled=0
@@ -288,83 +294,148 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating keyboard backlight script..."
 sudo tee /usr/local/bin/fix-kbd-backlight.sh > /dev/null << 'EOF'
 #!/bin/sh
-# Keyboard backlight fix for apple_bce after boot/resume
-LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
-    local label="$1"
-    shift
-    local msg="$*"
-    local timestamp
-    timestamp=$(date "+%Y_%m_%d-%H:%M:%S")
-    echo "[${timestamp}][${label}] ${msg}" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][kbd-bl] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "kbd-bl" "Starting keyboard backlight fix..."
+t2_log "Starting keyboard backlight fix..."
 
-find_kbd_path() {
-    ls -1 /sys/class/leds/*kbd_backlight*/brightness 2>/dev/null | head -n1
-}
-
-set_kbd_brightness() {
-    # Use brightnessctl with 1%
-    if command -v brightnessctl >/dev/null 2>&1; then
-        brightnessctl -d :white:kbd_backlight set 1% -q 2>&1
-        CURRENT=$(brightnessctl -d :white:kbd_backlight get 2>/dev/null)
-        if [ -n "$CURRENT" ] && [ "$CURRENT" -gt 0 ]; then
-            t2_log "kbd-bl" "OK: brightness set to $CURRENT"
-            return 0
-        fi
-        t2_log "kbd-bl" "ERROR: brightness still 0"
-    fi
-    return 1
-}
-
-# Try immediately first
-if set_kbd_brightness; then
-    t2_log "kbd-bl" "OK: keyboard backlight set immediately via sysfs"
-    exit 0
-fi
-
-# Poll
-for i in $(seq 1 30); do
-    if set_kbd_brightness; then
-        t2_log "kbd-bl" "OK: keyboard backlight set after $i/15 attempts"
-        exit 0
-    fi
+for i in $(seq 1 10); do
+    SET_OUTPUT=$(brightnessctl -d :white:kbd_backlight set 10% 2>&1)
+    CURRENT=$(brightnessctl -d :white:kbd_backlight get 2>/dev/null)
+    case "$SET_OUTPUT" in
+        *"$CURRENT"*)
+            t2_log "OK: kbd backlight set to $CURRENT after $i/10 attempts"
+            exit 0
+            ;;
+    esac
     sleep 0.5
 done
 
-t2_log "kbd-bl" "ERROR: could not set keyboard backlight after 15 attempts"
-t2_log "kbd-bl" "DEBUG: checking leds directory..."
-ls -la /sys/class/leds/ 2>/dev/null | grep -i kbd
-t2_log "kbd-bl" "DEBUG: brightnessctl available: $(command -v brightnessctl || echo 'no')"
-t2_log "kbd-bl" "DEBUG: current brightness: $(cat /sys/class/leds/:white:kbd_backlight/brightness 2>/dev/null || echo 'read failed')"
+t2_log "ERROR: could not set kbd backlight after 10 attempts"
 exit 0
 EOF
 sudo chmod +x /usr/local/bin/fix-kbd-backlight.sh
+echo -e "${GREEN}Done${NC}"
+
+# Create gmux backlight fix service and script
+echo -e "\n${YELLOW}⚙${NC} Creating gmux backlight fix service..."
+sudo tee /etc/systemd/system/fix-gmux-backlight.service > /dev/null << 'EOF'
+[Unit]
+Description=Fix Apple GMUX Backlight After Resume
+After=multi-user.target
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=/usr/bin/bash /usr/local/bin/fix-gmux-backlight.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+echo -e "${GREEN}Done${NC}"
+
+# Create script that fixes gmux backlight on resume
+echo -e "\n${YELLOW}⚙${NC} Creating gmux backlight fix script..."
+sudo tee /usr/local/bin/fix-gmux-backlight.sh > /dev/null << 'EOF'
+#!/bin/sh
+t2_log() {
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][gmux-bl] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
+}
+t2_log "Starting gmux backlight fix..."
+
+for i in $(seq 1 10); do
+    SET_OUTPUT=$(brightnessctl -d gmux_backlight set 10% 2>&1)
+    CURRENT=$(brightnessctl -d gmux_backlight get 2>/dev/null)
+    case "$SET_OUTPUT" in
+        *"$CURRENT"*)
+            t2_log "OK: gmux backlight set to $CURRENT after $i/10 attempts"
+            exit 0
+            ;;
+    esac
+    sleep 0.5
+done
+
+t2_log "ERROR: could not set gmux backlight after 10 attempts"
+exit 0
+EOF
+sudo chmod +x /usr/local/bin/fix-gmux-backlight.sh
+echo -e "${GREEN}Done${NC}"
+
+# Create DRM display off script (iGPU only - card2)
+echo -e "\n${YELLOW}⚙${NC} Creating DRM display off script..."
+sudo tee /usr/local/bin/drm-display-off.sh > /dev/null << 'EOF'
+#!/bin/sh
+t2_log() {
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][drm-off] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
+}
+t2_log "Starting DRM display off..."
+
+CARD="/sys/class/drm/card2-eDP-1"
+[ -f "$CARD/status" ] || exit 0
+if grep -q "connected" "$CARD/status" 2>/dev/null; then
+    t2_log "Turning off $CARD"
+    for i in $(seq 1 10); do
+        echo off > "$CARD/status" 2>/dev/null
+        STATUS=$(cat "$CARD/status" 2>/dev/null)
+        if [ "$STATUS" = "disconnected" ]; then
+            t2_log "OK: $CARD off after $i/10 attempts"
+            exit 0
+        fi
+        sleep 0.5
+    done
+    t2_log "ERROR: failed to turn off $CARD"
+fi
+exit 0
+EOF
+sudo chmod +x /usr/local/bin/drm-display-off.sh
+echo -e "${GREEN}Done${NC}"
+
+# Create DRM display on script (iGPU only - card2)
+echo -e "\n${YELLOW}⚙${NC} Creating DRM display on script..."
+sudo tee /usr/local/bin/drm-display-on.sh > /dev/null << 'EOF'
+#!/bin/sh
+t2_log() {
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][drm-on] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
+}
+t2_log "Starting DRM display on..."
+
+CARD="/sys/class/drm/card2-eDP-1"
+[ -f "$CARD/status" ] || exit 0
+if grep -q "disconnected" "$CARD/status" 2>/dev/null; then
+    t2_log "Turning on $CARD"
+    for i in $(seq 1 10); do
+        echo on > "$CARD/status" 2>/dev/null
+        STATUS=$(cat "$CARD/status" 2>/dev/null)
+        if [ "$STATUS" = "connected" ]; then
+            t2_log "OK: $CARD on after $i/10 attempts"
+            exit 0
+        fi
+        sleep 0.5
+    done
+    t2_log "ERROR: failed to turn on $CARD"
+fi
+exit 0
+EOF
+sudo chmod +x /usr/local/bin/drm-display-on.sh
 echo -e "${GREEN}Done${NC}"
 
 # Create helper wait scripts
 echo -e "\n${YELLOW}⚙${NC} Creating helper wait scripts..."
 sudo tee /usr/local/bin/t2-wait-apple-bce.sh > /dev/null << 'EOF'
 #!/bin/sh
-LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
-    local label="$1"
-    shift
-    local msg="$*"
-    local timestamp
-    timestamp=$(date "+%Y_%m_%d-%H:%M:%S")
-    echo "[${timestamp}][${label}] ${msg}" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][wait-bce] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "wait-bce" "Starting wait for appletbdrm in lsmod..."
+t2_log "Starting wait for appletbdrm in lsmod..."
 for i in $(seq 1 30); do
     if lsmod | grep -q "^appletbdrm"; then
-        t2_log "wait-bce" "OK: appletbdrm found in lsmod (attempt $i/15)"
+        t2_log "OK: appletbdrm found in lsmod (attempt $i/15)"
         exit 0
     fi
     sleep 0.5
 done
-t2_log "wait-bce" "ERROR: appletbdrm not found in lsmod after 15 attempts"
+t2_log "ERROR: appletbdrm not found in lsmod after 15 attempts"
 exit 1
 EOF
 sudo chmod +x /usr/local/bin/t2-wait-apple-bce.sh
@@ -374,23 +445,17 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating audio stop/start helper scripts..."
 sudo tee /usr/local/bin/t2-stop-audio.sh > /dev/null << 'AUDIOEOF'
 #!/bin/sh
-LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
-    local label="$1"
-    shift
-    local msg="$*"
-    local timestamp
-    timestamp=$(date "+%Y_%m_%d-%H:%M:%S")
-    echo "[${timestamp}][${label}] ${msg}" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][stop-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "audio" "Stopping PipeWire audio session..."
+t2_log "Stopping PipeWire audio session..."
 uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
 if [ -z "$uid" ]; then
-    t2_log "audio" "SKIP: no user session found"
+    t2_log "SKIP: no user session found"
     exit 0
 fi
 if [ ! -S "/run/user/$uid/bus" ]; then
-    t2_log "audio" "SKIP: no D-Bus session found for uid $uid"
+    t2_log "SKIP: no D-Bus session found for uid $uid"
     exit 0
 fi
 username=$(id -nu "$uid" 2>/dev/null) || exit 0
@@ -399,43 +464,37 @@ DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     runuser -u "$username" -- \
     systemctl --user stop pipewire.socket pipewire-pulse.socket \
         pipewire.service pipewire-pulse.service wireplumber.service 2>/dev/null
-t2_log "audio" "OK: PipeWire stopped for user $username"
+t2_log "OK: PipeWire stopped for user $username"
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-stop-audio.sh
 
 sudo tee /usr/local/bin/t2-start-audio.sh > /dev/null << 'AUDIOEOF'
 #!/bin/sh
-LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
-    local label="$1"
-    shift
-    local msg="$*"
-    local timestamp
-    timestamp=$(date "+%Y_%m_%d-%H:%M:%S")
-    echo "[${timestamp}][${label}] ${msg}" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][start-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "audio" "Starting PipeWire audio session..."
+t2_log "Starting PipeWire audio session..."
 uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
 if [ -z "$uid" ]; then
-    t2_log "audio" "SKIP: no user session found"
+    t2_log "SKIP: no user session found"
     exit 0
 fi
 if [ ! -S "/run/user/$uid/bus" ]; then
-    t2_log "audio" "SKIP: no D-Bus session found for uid $uid"
+    t2_log "SKIP: no D-Bus session found for uid $uid"
     exit 0
 fi
 username=$(id -nu "$uid" 2>/dev/null) || exit 0
-t2_log "audio" "Starting PipeWire for user $username (uid=$uid)..."
+t2_log "Starting PipeWire for user $username (uid=$uid)..."
 XDG_RUNTIME_DIR="/run/user/$uid" \
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     runuser -u "$username" -- \
     systemctl --user start pipewire.socket pipewire-pulse.socket 2>/dev/null
-t2_log "audio" "OK: PipeWire sockets started"
+t2_log "OK: PipeWire sockets started"
 
 # Restore T2 DSP default devices if wpctl is available
 if command -v wpctl >/dev/null 2>&1; then
-    t2_log "audio" "Checking for T2 DSP devices (polling for 5s)..."
+    t2_log "Checking for T2 DSP devices (polling for 5s)..."
     # Poll for up to 5s for DSP devices to appear
     for i in $(seq 1 10); do
         T2_SPEAKERS=$(XDG_RUNTIME_DIR="/run/user/$uid" \
@@ -451,18 +510,18 @@ if command -v wpctl >/dev/null 2>&1; then
     done
     if [ -n "$T2_SPEAKERS" ]; then
         XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" wpctl set-default "$T2_SPEAKERS" 2>/dev/null
-        t2_log "audio" "OK: T2 speakers set to $T2_SPEAKERS"
+        t2_log "OK: T2 speakers set to $T2_SPEAKERS"
     else
-        t2_log "audio" "NOTE: T2 speakers not found after 5s"
+        t2_log "NOTE: T2 speakers not found after 5s"
     fi
     if [ -n "$T2_MIC" ]; then
         XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" wpctl set-default "$T2_MIC" -s 2>/dev/null
-        t2_log "audio" "OK: T2 mic set to $T2_MIC"
+        t2_log "OK: T2 mic set to $T2_MIC"
     else
-        t2_log "audio" "NOTE: T2 mic not found after 5s"
+        t2_log "NOTE: T2 mic not found after 5s"
     fi
 fi
-t2_log "audio" "OK: audio services started"
+t2_log "OK: audio services started"
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-start-audio.sh
@@ -503,13 +562,6 @@ unload_mod() {
     local mod="$1"
     t2_log "Unloading $mod..."
     /usr/bin/rmmod "$mod" 2>/dev/null || true
-    lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
-}
-
-unload_mod_force() {
-    local mod="$1"
-    t2_log "Force unloading $mod..."
-    /usr/bin/rmmod -f "$mod" 2>/dev/null || true
     lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
 }
 
@@ -554,26 +606,23 @@ stop_service t2fanrd
 # Stop audio
 /usr/local/bin/t2-stop-audio.sh
 
-# Backlight off
+# Turn off keyboard backlight
 t2_log "Turning off keyboard backlight..."
 /usr/bin/brightnessctl -sd :white:kbd_backlight set 0 -q 2>/dev/null || true
 t2_log "OK: keyboard backlight off"
 
-# Unload WiFi / Bluetooth driver
+# Unload WiFi / Bluetooth
 unload_mod brcmfmac_wcc
 unload_mod brcmfmac
 unload_mod brcmutil
 
-# Unload Bluetooth driver
-# unload_mod hci_bcm4377
-
-# Unload touchbar drivers
+# Unload Touchbar
 unload_mod hid_appletb_bl
 unload_mod hid_appletb_kbd
 unload_mod appletbdrm
 unload_mod sparse_keymap
 
-# Sensors
+# Unload Sensors
 unload_mod hid_sensor_als
 unload_mod hid_sensor_rotation
 unload_mod hid_sensor_trigger
@@ -583,11 +632,19 @@ unload_mod industrialio_triggered_buffer
 unload_mod kfifo_buf
 unload_mod industrialio
 
-# Apple BCE removal
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
-unload_mod_force apple_bce
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# Unload Apple GMUX
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
+# Turn off internal display before unloading gmux
+/usr/local/bin/drm-display-off.sh
+
+unload_mod apple_gmux
+
+# Unload Apple BCE
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+unload_mod apple_bce
+
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 t2_log "Suspend complete, ready to sleep"
 SUSPEND_EOF
 sudo chmod +x /usr/local/bin/t2-suspend.sh
@@ -597,9 +654,8 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating resume script..."
 sudo tee /usr/local/bin/t2-resume.sh > /dev/null << 'RESUME_EOF'
 #!/bin/sh
-LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][resume] $*" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][resume] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
 
 load_mod() {
@@ -625,14 +681,18 @@ start_service() {
 }
 
 t2_log "Starting resume..."
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
-# Load apple_bce first (foundation for everything)
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# Load Apple BCE
 load_mod apple_bce
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
-# Sensors
+# Load Apple GMUX
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+load_mod apple_gmux
+
+# Load Sensors
 load_mod industrialio
-load_mod industrialio_triggered_buffer
 load_mod kfifo_buf
 load_mod hid_sensor_hub
 load_mod hid_sensor_iio_common
@@ -640,20 +700,24 @@ load_mod hid_sensor_trigger
 load_mod hid_sensor_rotation
 load_mod hid_sensor_als
 
-# Load Bluetooth driver
-# load_mod hci_bcm4377
-
-# Load WiFi / Bluetooth driver
+# Load WiFi / Bluetooth
 load_mod brcmutil
 load_mod brcmfmac
 load_mod brcmfmac_wcc
 
-# Wait for BCE PCI binding
+# Wait for BCE to bring up dependencies
 /usr/local/bin/t2-wait-apple-bce.sh
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
-# Restore keyboard backlight
+# Turn on keyboard backlight
 /usr/local/bin/fix-kbd-backlight.sh
+
+# Fix DRM display (turn off then on)
+/usr/local/bin/drm-display-off.sh
+/usr/local/bin/drm-display-on.sh
+
+# Turn on gmux backlight (display)
+/usr/local/bin/fix-gmux-backlight.sh
 
 # Restart audio
 /usr/local/bin/t2-start-audio.sh
@@ -708,6 +772,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable suspend-wifi-unload.service
 sudo systemctl enable resume-wifi-reload.service
 sudo systemctl enable fix-kbd-backlight.service 
+sudo systemctl enable fix-gmux-backlight.service
 echo -e "${GREEN}Done${NC}"
 
 # Disable thermald if present
