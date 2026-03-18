@@ -633,7 +633,7 @@ unload_mod kfifo_buf
 unload_mod industrialio
 
 # Unload Apple GMUX
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Turn off internal display before unloading gmux
 /usr/local/bin/drm-display-off.sh
@@ -641,10 +641,10 @@ lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 unload_mod apple_gmux
 
 # Unload Apple BCE
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 unload_mod apple_bce
 
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 t2_log "Suspend complete, ready to sleep"
 SUSPEND_EOF
 sudo chmod +x /usr/local/bin/t2-suspend.sh
@@ -681,15 +681,19 @@ start_service() {
 }
 
 t2_log "Starting resume..."
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Load Apple BCE
 load_mod apple_bce
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Load Apple GMUX
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 load_mod apple_gmux
+
+# Fix DRM display (turn off then on)
+/usr/local/bin/drm-display-off.sh
+/usr/local/bin/drm-display-on.sh
 
 # Load Sensors
 load_mod industrialio
@@ -707,14 +711,10 @@ load_mod brcmfmac_wcc
 
 # Wait for BCE to bring up dependencies
 /usr/local/bin/t2-wait-apple-bce.sh
-lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Turn on keyboard backlight
 /usr/local/bin/fix-kbd-backlight.sh
-
-# Fix DRM display (turn off then on)
-/usr/local/bin/drm-display-off.sh
-/usr/local/bin/drm-display-on.sh
 
 # Turn on gmux backlight (display)
 /usr/local/bin/fix-gmux-backlight.sh
