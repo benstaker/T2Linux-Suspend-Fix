@@ -27,16 +27,6 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-# Detect distribution
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    DISTRO_ID="$ID"
-    DISTRO_ID_LIKE="$ID_LIKE"
-else
-    echo -e "${RED}Error: Cannot detect distribution.${NC}"
-    exit 1
-fi
-
 MODE="install"
 echo -e "${YELLOW}Select action:${NC}"
 echo "1) Install"
