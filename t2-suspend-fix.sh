@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# T2 MacBook Suspend Fix Installer
-# Use at your own risk!
-# André Eikmeyer, Reken, Germany - 2026-02-05
+# T2 MacBook Suspend Fix Installer - Use at your own risk!
 
 set -e
 
@@ -10,10 +8,6 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
-VERSION="1.5.0"
-
-BACKUP_DIR="/etc/t2-suspend-fix"
-OVERRIDE_BACKUP="${BACKUP_DIR}/override.conf.bak"
 LOG_FILE="/var/log/t2-suspend-fix.log"
 
 t2_log() {
@@ -96,16 +90,6 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
     sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
     echo "  - Unit files and scripts removed."
-
-    # Restore override.conf if backed up
-    if [ -f "$OVERRIDE_BACKUP" ]; then
-        echo "  - Restoring override.conf..."
-        sudo mkdir -p /etc/systemd/system/systemd-suspend.service.d
-        sudo cp "$OVERRIDE_BACKUP" /etc/systemd/system/systemd-suspend.service.d/override.conf
-        echo "  - override.conf restored."
-    else
-        echo "  - No override.conf backup found. Skipping restore."
-    fi
 
     echo "  - Reloading systemd..."
     sudo systemctl daemon-reload
@@ -599,23 +583,6 @@ echo -e "${GREEN}Done${NC}"
 
 # Kernel parameters info
 echo -e "\n${YELLOW}NOTE${NC}: See README.md for more information on modifying kernel parameters."
-
-# Remove override.conf
-echo -e "\n${YELLOW}⚙${NC} Checking for override.conf..."
-if [ -f /etc/systemd/system/systemd-suspend.service.d/override.conf ]; then
-    echo "  - Removing systemd-suspend override.conf..."
-    # Backup override.conf once
-    if [ ! -f "$OVERRIDE_BACKUP" ]; then
-        sudo mkdir -p "$BACKUP_DIR"
-        sudo cp /etc/systemd/system/systemd-suspend.service.d/override.conf "$OVERRIDE_BACKUP"
-        echo "  - Backed up override.conf to $OVERRIDE_BACKUP"
-    fi
-    sudo rm /etc/systemd/system/systemd-suspend.service.d/override.conf
-    sudo systemctl daemon-reload
-    echo -e "${GREEN}Done${NC}"
-else
-    echo -e "${GREEN}No override.conf found${NC}"
-fi
 
 # Summary
 echo -e "\n${GREEN}=== Installation Complete ===${NC}\n"
