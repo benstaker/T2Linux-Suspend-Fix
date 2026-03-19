@@ -19,17 +19,19 @@ Forked and inspired by:
 
 ### Kernel arguments:
 
-1. `mem_sleep_default=deep`
-2. `pcie_aspm=off`
-3. `intel_iommu=on`
-4. `iommu=pt`
-5. `pcie_ports=compat`
-6. ...defaults...
+- `intel_pstate=disable`
+- `i915.enable_guc=3`
+- `mem_sleep_default=deep`
+- `pcie_aspm=off`
+- `intel_iommu=on`
+- `iommu=pt`
+- `pcie_ports=compat`
+- ...defaults...
 
 
 ### Services installed:
 
-1. tiny-dfr (via pacman)
+1. [NoaHimesaka1873/tiny-dfr-arch](https://github.com/NoaHimesaka1873/tiny-dfr-arch)
 2. brightnessctl (via pacman)
 2. [auto-cpufreq](https://github.com/AdnanHodzic/auto-cpufreq)
 
@@ -47,16 +49,15 @@ Forked and inspired by:
 
 ### My experience:
 
-1. Suspends within ~3 seconds, can hear the fans go off completely.
-2. Waking: Screen on ~11 seconds + ~3s for backlight / touchbar + ~7s for wifi
-3. Battery life consumed when suspended around 1.5%-2% per hour.
+1. Suspends within ~4 seconds, can hear the fans go off completely.
+2. Waking: Screen on ~14 seconds + ~4 seconds for restarting display.
+3. Battery life consumed when suspended around 0.5% - 0.75% per hour.
 
 
 ### Things to know:
 
 1. If you force shutdown, you will need to boot into MacOS, then restart from the login screen and then boot back into linux. Otherwise some devices do not work.
 2. I have tried using `pcie_ports=native`, but this slows waking by a lot.
-3. I was unable to get [NoaHimesaka1873/tiny-dfr-arch](https://github.com/NoaHimesaka1873/tiny-dfr-arch) working just yet.
-4. Tried using [deqrocks/apple-bce-drv](https://github.com/deqrocks/apple-bce-drv), however this caused issues with the touchbar working after waking.
-5. Putting the laptop to sleep whilst USB-C charging prevents the touchbar waking up - unplugging and then suspending / waking fixes this.
-6. Plugging in a USB-C charger whilst the lid is closed prevents the touchbar waking up - unplugging and then suspending / waking fixes this.
+3. Tried using [deqrocks/apple-bce-drv](https://github.com/deqrocks/apple-bce-drv), however this caused issues with the touchbar working after waking.
+4. Putting the laptop to sleep whilst USB-C charging prevents the touchbar waking up - unplugging and then suspending / waking fixes this.
+5. Plugging in a USB-C charger whilst the lid is closed prevents the touchbar waking up - unplugging and then suspending / waking fixes this.
