@@ -43,7 +43,7 @@ else
 fi
 
 if [ "$MODE" = "uninstall" ]; then
-    echo -e "${YELLOW}⚙${NC} Uninstalling and restoring backups..."
+    echo -e "${YELLOW}⚙${NC} Uninstalling..."
 
     # Disable and remove (previous) fixes
     echo "  - Disabling services..."
