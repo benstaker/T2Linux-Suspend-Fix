@@ -15,7 +15,6 @@ VERSION="1.5.0"
 BACKUP_DIR="/etc/t2-suspend-fix"
 THERMALD_STATE_FILE="${BACKUP_DIR}/thermald_enabled"
 OVERRIDE_BACKUP="${BACKUP_DIR}/override.conf.bak"
-WAKEUP_BACKUP="${BACKUP_DIR}/wakeup_devices.bak"
 LOG_FILE="/var/log/t2-suspend-fix.log"
 
 t2_log() {
@@ -25,32 +24,6 @@ t2_log() {
     local timestamp
     timestamp=$(date "+%Y_%m_%d-%H:%M:%S")
     echo "[${timestamp}][${label}] ${msg}" | tee -a "$LOG_FILE" 2>/dev/null || true
-}
-
-capture_acpi_wakeup_state() {
-    sudo mkdir -p "$BACKUP_DIR"
-    sudo sh -c "cat /proc/acpi/wakeup > '$WAKEUP_BACKUP'"
-}
-
-enable_all_wakeup_devices() {
-    while read -r dev _ status _; do
-        [ "$dev" = "Device" ] && continue
-        if [ "$status" = "*disabled" ]; then
-            sudo sh -c "echo $dev > /proc/acpi/wakeup"
-        fi
-    done < /proc/acpi/wakeup
-}
-
-restore_acpi_wakeup_state() {
-    [ -f "$WAKEUP_BACKUP" ] || return 0
-    while read -r dev _ desired_status _; do
-        [ "$dev" = "Device" ] && continue
-        current_status=$(awk -v d="$dev" '$1==d {print $3}' /proc/acpi/wakeup)
-        [ -z "$current_status" ] && continue
-        if [ "$current_status" != "$desired_status" ]; then
-            sudo sh -c "echo $dev > /proc/acpi/wakeup"
-        fi
-    done < "$WAKEUP_BACKUP"
 }
 
 echo -e "${GREEN}=== T2 MacBook Suspend Fix Installer v${VERSION} ===${NC}\n"
@@ -148,15 +121,6 @@ if [ "$MODE" = "uninstall" ]; then
         echo "  - No thermald state file found. Skipping."
     fi
 
-    # Restore ACPI wake sources
-    if [ -f "$WAKEUP_BACKUP" ]; then
-        echo "  - Restoring ACPI wake sources..."
-        restore_acpi_wakeup_state
-        echo "  - ACPI wake sources restored."
-    else
-        echo "  - No ACPI wake backup found. Skipping."
-    fi
-
     # Update GRUB if possible after restore
     if [ "$GRUB_RESTORED" = true ]; then
         echo "  - Updating GRUB..."
@@ -185,50 +149,6 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Installation cancelled."
     exit 0
 fi
-
-# Enable all wakeup devices (backup current state first)
-echo -e "\n${YELLOW}⚙${NC} Enabling all wakeup devices..."
-capture_acpi_wakeup_state
-enable_all_wakeup_devices
-sudo systemctl daemon-reload
-echo -e "${GREEN}Done${NC}"
-
-# Create service to enable wakeup devices at boot
-echo -e "\n${YELLOW}⚙${NC} Creating wakeup devices service..."
-sudo tee /etc/systemd/system/enable-wakeup-devices.service > /dev/null << 'EOF'
-[Unit]
-Description=Enable all wakeup devices for suspend
-After=multi-user.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/enable-wakeup-devices.sh
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo tee /usr/local/bin/enable-wakeup-devices.sh > /dev/null << 'EOF'
-#!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][wakeup] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
-t2_log "Starting enable wakeup devices..."
-enabled=0
-while read -r dev _ status _; do
-    [ "$dev" = "Device" ] && continue
-    if [ "$status" = "*disabled" ]; then
-        echo "$dev" > /proc/acpi/wakeup
-        t2_log "OK: enabled $dev wakeup"
-        enabled=$((enabled + 1))
-    fi
-done < /proc/acpi/wakeup
-t2_log "Done: enabled $enabled wakeup devices"
-EOF
-sudo chmod +x /usr/local/bin/enable-wakeup-devices.sh
-sudo systemctl enable enable-wakeup-devices.service
-echo -e "${GREEN}Done${NC}"
 
 # Create systemd service that calls a script to reload the KBD backlight on boot
 echo -e "\n${YELLOW}⚙${NC} Creating KBD reload service..."
@@ -504,22 +424,6 @@ t2_log() {
 }
 lsmod_log() {
     lsmod | grep -E 'apple|bcm|brcm|industrialio|kfifo|sensor|sparse' >> "$LOG_FILE" 2>/dev/null || true
-}
-
-disable_dev_wakeup() {
-    local dev="$1"
-    [ -z "$dev" ] && return 1
-    local current
-    current=$(awk -v d="$dev" '$1==d {print $3}' /proc/acpi/wakeup)
-    case "$current" in
-        "*enabled"|"enabled")
-            echo "$dev" > /proc/acpi/wakeup
-            t2_log "Disabled wakeup for $dev"
-            ;;
-        "*disabled"|"disabled")
-            t2_log "Wakeup already disabled for $dev"
-            ;;
-    esac
 }
 
 unload_mod() {
