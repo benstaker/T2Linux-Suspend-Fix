@@ -115,6 +115,7 @@ if [ "$MODE" = "uninstall" ]; then
     sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
     sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
+    sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
     sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
     sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
     sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
@@ -126,6 +127,7 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /etc/systemd/system/resume-wifi-reload.service
     sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
+    sudo rm -f /etc/systemd/system/fix-gmux-display.service
     sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
     sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
     sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
@@ -214,6 +216,7 @@ sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
 sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
 sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
 sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
+sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
 sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
 echo "  - Old services disabled."
 
@@ -222,6 +225,7 @@ sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
 sudo rm -f /etc/systemd/system/resume-wifi-reload.service
 sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
 sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
+sudo rm -f /etc/systemd/system/fix-gmux-display.service
 sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
 sudo rm -f /etc/systemd/system/suspend-fix-t2.service
 sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
@@ -317,21 +321,23 @@ EOF
 sudo chmod +x /usr/local/bin/fix-kbd-backlight.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create gmux backlight fix service and script
-echo -e "\n${YELLOW}⚙${NC} Creating gmux backlight fix service..."
-sudo tee /etc/systemd/system/fix-gmux-backlight.service > /dev/null << 'EOF'
+# Create gmux display fix service
+echo -e "\n${YELLOW}⚙${NC} Creating gmux display fix service..."
+sudo tee /etc/systemd/system/fix-gmux-display.service > /dev/null << 'EOF'
 [Unit]
-Description=Fix Apple GMUX Backlight After Resume
-After=multi-user.target
+Description=Fix Apple GMUX Display After Resume
+After=graphical.target
 
 [Service]
 User=root
 Type=oneshot
-ExecStart=/usr/bin/bash /usr/local/bin/fix-gmux-backlight.sh
+ExecStart=/usr/local/bin/drm-display-off.sh
+ExecStart=/usr/local/bin/drm-display-on.sh
+ExecStart=/usr/local/bin/fix-gmux-backlight.sh
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target
 EOF
 echo -e "${GREEN}Done${NC}"
 
@@ -350,6 +356,7 @@ for i in $(seq 1 10); do
     case "$SET_OUTPUT" in
         *"$CURRENT"*)
             t2_log "OK: gmux backlight set to $CURRENT after $i/10 attempts"
+            sleep 0.5
             exit 0
             ;;
     esac
@@ -680,10 +687,6 @@ load_mod apple_bce
 # Load Apple GMUX
 load_mod apple_gmux
 
-# Fix DRM display (turn off then on)
-/usr/local/bin/drm-display-off.sh
-/usr/local/bin/drm-display-on.sh
-
 # Load Sensors
 load_mod industrialio
 load_mod hid_sensor_rotation
@@ -699,15 +702,19 @@ load_mod brcmfmac_wcc
 # Turn on keyboard backlight
 /usr/local/bin/fix-kbd-backlight.sh
 
-# Turn on gmux backlight (display)
-/usr/local/bin/fix-gmux-backlight.sh
-
 # Restart audio
 /usr/local/bin/t2-start-audio.sh
 
 # Start user services
 start_service t2fanrd
 start_service tiny-dfr
+
+# Fix DRM display
+/usr/local/bin/drm-display-off.sh
+sleep 0.5
+/usr/local/bin/drm-display-on.sh
+sleep 0.5
+/usr/local/bin/fix-gmux-backlight.sh
 
 t2_log "Resume complete"
 lsmod_log
@@ -756,7 +763,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable suspend-wifi-unload.service
 sudo systemctl enable resume-wifi-reload.service
 sudo systemctl enable fix-kbd-backlight.service 
-sudo systemctl enable fix-gmux-backlight.service
+sudo systemctl enable fix-gmux-display.service
 echo -e "${GREEN}Done${NC}"
 
 # Disable thermald if present
