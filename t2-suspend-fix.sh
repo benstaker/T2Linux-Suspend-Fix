@@ -27,25 +27,6 @@ t2_log() {
     echo "[${timestamp}][${label}] ${msg}" | tee -a "$LOG_FILE" 2>/dev/null || true
 }
 
-ensure_libnotify() {
-    if command -v notify-send >/dev/null 2>&1; then
-        echo -e "${GREEN}libnotify already installed (notify-send found)${NC}"
-        return 0
-    fi
-    echo -e "${YELLOW}Installing libnotify (notify-send not found)...${NC}"
-    if command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y libnotify
-    elif command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update
-        sudo apt-get install -y libnotify-bin
-    elif command -v pacman >/dev/null 2>&1; then
-        sudo pacman -Sy --noconfirm libnotify
-    else
-        echo -e "${YELLOW}Warning: No supported package manager found. Please install libnotify manually.${NC}"
-        return 1
-    fi
-}
-
 capture_acpi_wakeup_state() {
     sudo mkdir -p "$BACKUP_DIR"
     sudo sh -c "cat /proc/acpi/wakeup > '$WAKEUP_BACKUP'"
@@ -204,9 +185,6 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Installation cancelled."
     exit 0
 fi
-
-# Ensure libnotify is available for desktop notifications
-ensure_libnotify || true
 
 # Enable all wakeup devices (backup current state first)
 echo -e "\n${YELLOW}⚙${NC} Enabling all wakeup devices..."
