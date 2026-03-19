@@ -208,30 +208,6 @@ fi
 # Ensure libnotify is available for desktop notifications
 ensure_libnotify || true
 
-# Remove prior systemd fixes
-echo -e "\n${YELLOW}⚙${NC} Removing prior systemd fixes (if any)..."
-echo "  - Disabling old services..."
-sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
-sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
-sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
-sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
-sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
-sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
-sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
-echo "  - Old services disabled."
-
-echo "  - Removing old unit files..."
-sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
-sudo rm -f /etc/systemd/system/resume-wifi-reload.service
-sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
-sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
-sudo rm -f /etc/systemd/system/fix-gmux-display.service
-sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
-sudo rm -f /etc/systemd/system/suspend-fix-t2.service
-sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
-sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
-echo "  - Old unit files removed."
-
 # Enable all wakeup devices (backup current state first)
 echo -e "\n${YELLOW}⚙${NC} Enabling all wakeup devices..."
 capture_acpi_wakeup_state
