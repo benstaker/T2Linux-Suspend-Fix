@@ -13,7 +13,6 @@ NC='\033[0m'
 VERSION="1.5.0"
 
 BACKUP_DIR="/etc/t2-suspend-fix"
-THERMALD_STATE_FILE="${BACKUP_DIR}/thermald_enabled"
 OVERRIDE_BACKUP="${BACKUP_DIR}/override.conf.bak"
 LOG_FILE="/var/log/t2-suspend-fix.log"
 
@@ -106,19 +105,6 @@ if [ "$MODE" = "uninstall" ]; then
         echo "  - override.conf restored."
     else
         echo "  - No override.conf backup found. Skipping restore."
-    fi
-
-    # Restore thermald if it was enabled
-    if [ -f "$THERMALD_STATE_FILE" ]; then
-        if grep -q "^enabled=1" "$THERMALD_STATE_FILE"; then
-            echo "  - Re-enabling thermald..."
-            sudo systemctl enable --now thermald || true
-            echo "  - thermald re-enabled."
-        else
-            echo "  - thermald was not enabled before. Skipping."
-        fi
-    else
-        echo "  - No thermald state file found. Skipping."
     fi
 
     # Update GRUB if possible after restore
@@ -623,20 +609,6 @@ sudo systemctl enable resume-wifi-reload.service
 sudo systemctl enable fix-kbd-backlight.service 
 sudo systemctl enable fix-gmux-display.service
 echo -e "${GREEN}Done${NC}"
-
-# Disable thermald if present
-echo -e "\n${YELLOW}⚙${NC} Checking for thermald..."
-if systemctl is-enabled thermald &>/dev/null; then
-    echo "  - Disabling thermald..."
-    sudo mkdir -p "$BACKUP_DIR"
-    echo "enabled=1" | sudo tee "$THERMALD_STATE_FILE" > /dev/null
-    sudo systemctl disable --now thermald
-    echo -e "${GREEN}Done${NC}"
-else
-    sudo mkdir -p "$BACKUP_DIR"
-    echo "enabled=0" | sudo tee "$THERMALD_STATE_FILE" > /dev/null
-    echo -e "${GREEN}thermald not found or not enabled${NC}"
-fi
 
 # Configure deep suspend mode
 echo -e "\n${YELLOW}NOTE${NC}: For deep suspend to work properly, add the following kernel parameters to your bootloader:"
