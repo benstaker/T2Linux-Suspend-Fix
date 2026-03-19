@@ -50,6 +50,8 @@ if [ "$MODE" = "uninstall" ]; then
     sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
     sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
     sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
+    sudo systemctl disable t2-suspend.service 2>/dev/null || true
+    sudo systemctl disable t2-resume.service 2>/dev/null || true
     sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
@@ -62,6 +64,8 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /etc/systemd/system/suspend-fix-t2.service
     sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
     sudo rm -f /etc/systemd/system/resume-wifi-reload.service
+    sudo rm -f /etc/systemd/system/t2-suspend.service
+    sudo rm -f /etc/systemd/system/t2-resume.service
     sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-display.service
@@ -529,11 +533,11 @@ RESUME_EOF
 sudo chmod +x /usr/local/bin/t2-resume.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create 'suspend-wifi-unload' service
-echo -e "\n${YELLOW}⚙${NC} Creating 'suspend-wifi-unload' service..."
-sudo tee /etc/systemd/system/suspend-wifi-unload.service > /dev/null << 'EOF'
+# Create 't2-suspend' service
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-suspend' service..."
+sudo tee /etc/systemd/system/t2-suspend.service > /dev/null << 'EOF'
 [Unit]
-Description=WiFi Unload Before Suspend
+Description=Suspend script for T2 MacBook
 Before=sleep.target
 StopWhenUnneeded=yes
 
@@ -547,11 +551,11 @@ WantedBy=sleep.target
 EOF
 echo -e "${GREEN}Done${NC}"
 
-# Create 'resume-wifi-reload' service
-echo -e "\n${YELLOW}⚙${NC} Creating 'resume-wifi-reload' service..."
-sudo tee /etc/systemd/system/resume-wifi-reload.service > /dev/null << 'EOF'
+# Create 't2-resume' service
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-resume' service..."
+sudo tee /etc/systemd/system/t2-resume.service > /dev/null << 'EOF'
 [Unit]
-Description=WiFi and BCE Reload After Resume
+Description=Resume script for T2 MacBook
 After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
 
 [Service]
@@ -567,8 +571,8 @@ echo -e "${GREEN}Done${NC}"
 # Activate services
 echo -e "\n${YELLOW}⚙${NC} Activating services..."
 sudo systemctl daemon-reload
-sudo systemctl enable suspend-wifi-unload.service
-sudo systemctl enable resume-wifi-reload.service
+sudo systemctl enable t2-suspend.service
+sudo systemctl enable t2-resume.service
 sudo systemctl enable fix-kbd-backlight.service 
 sudo systemctl enable fix-gmux-display.service
 echo -e "${GREEN}Done${NC}"
