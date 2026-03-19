@@ -97,8 +97,8 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Create systemd service that calls a script to reload the KBD backlight on boot
-echo -e "\n${YELLOW}⚙${NC} Creating KBD reload service..."
+# Create 'fix-kbd-backlight' service
+echo -e "\n${YELLOW}⚙${NC} Creating 'fix-kbd-backlight' service..."
 sudo tee /etc/systemd/system/fix-kbd-backlight.service > /dev/null << 'EOF'
 [Unit]
 Description=Fix Apple BCE Keyboard Backlight
@@ -115,8 +115,8 @@ WantedBy=multi-user.target
 EOF
 echo -e "${GREEN}Done${NC}"
 
-# Create script that reloads the keyboard backlight when systemd calls it
-echo -e "\n${YELLOW}⚙${NC} Creating keyboard backlight script..."
+# Create 'fix-kbd-backlight.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 'fix-kbd-backlight.sh' script..."
 sudo tee /usr/local/bin/fix-kbd-backlight.sh > /dev/null << 'EOF'
 #!/bin/sh
 t2_log() {
@@ -142,8 +142,8 @@ EOF
 sudo chmod +x /usr/local/bin/fix-kbd-backlight.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create gmux display fix service
-echo -e "\n${YELLOW}⚙${NC} Creating gmux display fix service..."
+# Create 'fix-gmux-display' service
+echo -e "\n${YELLOW}⚙${NC} Creating 'fix-gmux-display' service..."
 sudo tee /etc/systemd/system/fix-gmux-display.service > /dev/null << 'EOF'
 [Unit]
 Description=Fix Apple GMUX Display After Resume
@@ -162,8 +162,8 @@ WantedBy=graphical.target
 EOF
 echo -e "${GREEN}Done${NC}"
 
-# Create script that fixes gmux backlight on resume
-echo -e "\n${YELLOW}⚙${NC} Creating gmux backlight fix script..."
+# Create 'fix-gmux-backlight.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 'fix-gmux-backlight.sh' script..."
 sudo tee /usr/local/bin/fix-gmux-backlight.sh > /dev/null << 'EOF'
 #!/bin/sh
 t2_log() {
@@ -190,8 +190,8 @@ EOF
 sudo chmod +x /usr/local/bin/fix-gmux-backlight.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create DRM display off script (iGPU only - card2)
-echo -e "\n${YELLOW}⚙${NC} Creating DRM display off script..."
+# Create 'drm-display-off.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 'drm-display-off.sh' script..."
 sudo tee /usr/local/bin/drm-display-off.sh > /dev/null << 'EOF'
 #!/bin/sh
 t2_log() {
@@ -219,8 +219,8 @@ EOF
 sudo chmod +x /usr/local/bin/drm-display-off.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create DRM display on script (iGPU only - card2)
-echo -e "\n${YELLOW}⚙${NC} Creating DRM display on script..."
+# Create 'drm-display-on.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 'drm-display-on.sh' script..."
 sudo tee /usr/local/bin/drm-display-on.sh > /dev/null << 'EOF'
 #!/bin/sh
 t2_log() {
@@ -248,8 +248,8 @@ EOF
 sudo chmod +x /usr/local/bin/drm-display-on.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create helper wait scripts
-echo -e "\n${YELLOW}⚙${NC} Creating helper wait scripts..."
+# Create 't2-wait-apple-bce.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-wait-apple-bce.sh' script..."
 sudo tee /usr/local/bin/t2-wait-apple-bce.sh > /dev/null << 'EOF'
 #!/bin/sh
 t2_log() {
@@ -269,8 +269,8 @@ EOF
 sudo chmod +x /usr/local/bin/t2-wait-apple-bce.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create audio stop/start helper scripts
-echo -e "\n${YELLOW}⚙${NC} Creating audio stop/start helper scripts..."
+# Create 't2-stop-audio.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-stop-audio.sh' script..."
 sudo tee /usr/local/bin/t2-stop-audio.sh > /dev/null << 'AUDIOEOF'
 #!/bin/sh
 t2_log() {
@@ -297,6 +297,8 @@ exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-stop-audio.sh
 
+# Create 't2-start-audio.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-start-audio.sh' script..."
 sudo tee /usr/local/bin/t2-start-audio.sh > /dev/null << 'AUDIOEOF'
 #!/bin/sh
 t2_log() {
@@ -355,14 +357,14 @@ AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-start-audio.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create log file with proper permissions
-echo -e "\n${YELLOW}⚙${NC} Creating log file..."
+# Create log file
+echo -e "\n${YELLOW}⚙${NC} Creating log file '/var/log/t2-suspend-fix.log'..."
 sudo touch /var/log/t2-suspend-fix.log
 sudo chmod 666 /var/log/t2-suspend-fix.log
 echo -e "${GREEN}Done${NC}"
 
-# Create suspend script
-echo -e "\n${YELLOW}⚙${NC} Creating suspend script..."
+# Create 't2-suspend.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-suspend.sh' script..."
 sudo tee /usr/local/bin/t2-suspend.sh > /dev/null << 'SUSPEND_EOF'
 #!/bin/sh
 LOG_FILE="/var/log/t2-suspend-fix.log"
@@ -445,8 +447,8 @@ SUSPEND_EOF
 sudo chmod +x /usr/local/bin/t2-suspend.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create resume script
-echo -e "\n${YELLOW}⚙${NC} Creating resume script..."
+# Create 't2-resume.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-resume.sh' script..."
 sudo tee /usr/local/bin/t2-resume.sh > /dev/null << 'RESUME_EOF'
 #!/bin/sh
 LOG_FILE="/var/log/t2-suspend-fix.log"
@@ -527,8 +529,8 @@ RESUME_EOF
 sudo chmod +x /usr/local/bin/t2-resume.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create WiFi unload service
-echo -e "\n${YELLOW}⚙${NC} Creating WiFi unload service..."
+# Create 'suspend-wifi-unload' service
+echo -e "\n${YELLOW}⚙${NC} Creating 'suspend-wifi-unload' service..."
 sudo tee /etc/systemd/system/suspend-wifi-unload.service > /dev/null << 'EOF'
 [Unit]
 Description=WiFi Unload Before Suspend
@@ -545,8 +547,8 @@ WantedBy=sleep.target
 EOF
 echo -e "${GREEN}Done${NC}"
 
-# Create service that reloads WiFi after resume
-echo -e "\n${YELLOW}⚙${NC} Creating WiFi reload service..."
+# Create 'resume-wifi-reload' service
+echo -e "\n${YELLOW}⚙${NC} Creating 'resume-wifi-reload' service..."
 sudo tee /etc/systemd/system/resume-wifi-reload.service > /dev/null << 'EOF'
 [Unit]
 Description=WiFi and BCE Reload After Resume
