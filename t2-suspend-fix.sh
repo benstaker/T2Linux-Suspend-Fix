@@ -580,14 +580,5 @@ echo -e "${GREEN}Done${NC}"
 # Kernel parameters info
 echo -e "\n${YELLOW}NOTE${NC}: See README.md for more information on modifying kernel parameters."
 
-# Summary
+# Complete
 echo -e "\n${GREEN}=== Installation Complete ===${NC}\n"
-echo ""
-echo -e "${YELLOW}IMPORTANT NOTES:${NC}"
-echo "Reminder: Suspend/Resume takes longer than on MacOS. This is normal behavior and not a malfunction"
-echo ""
-read -p "Reboot now? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    sudo reboot
-fi
