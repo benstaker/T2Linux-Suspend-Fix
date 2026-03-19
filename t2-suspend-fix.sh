@@ -541,6 +541,9 @@ LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][suspend] $*" >> "$LOG_FILE" 2>/dev/null || true
 }
+lsmod_log() {
+    lsmod | grep -E 'apple|bcm|brcm|industrialio|kfifo|sensor|sparse' >> "$LOG_FILE" 2>/dev/null || true
+}
 
 disable_dev_wakeup() {
     local dev="$1"
@@ -560,9 +563,13 @@ disable_dev_wakeup() {
 
 unload_mod() {
     local mod="$1"
-    t2_log "Unloading $mod..."
-    /usr/bin/rmmod "$mod" 2>/dev/null || true
-    lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
+    if lsmod | grep -q "^${mod}"; then
+        t2_log "Unloading $mod..."
+        /usr/bin/modprobe -r "$mod" 2>/dev/null || true
+        lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
+    else
+        t2_log "No unload needed for $mod"
+    fi
 }
 
 stop_service() {
@@ -581,23 +588,7 @@ stop_service() {
 }
 
 t2_log "Starting suspend sequence..."
-
-# Disable wakeup
-disable_dev_wakeup ADP1
-disable_dev_wakeup EC
-disable_dev_wakeup XHC1
-disable_dev_wakeup XHC2
-disable_dev_wakeup XHC3
-disable_dev_wakeup RP01
-disable_dev_wakeup RP17
-disable_dev_wakeup GFX0
-disable_dev_wakeup BLTH
-disable_dev_wakeup ARPT
-disable_dev_wakeup PEG0
-disable_dev_wakeup PEG1
-disable_dev_wakeup PEG2
-disable_dev_wakeup ARPT
-disable_dev_wakeup GPUC
+lsmod_log
 
 # Stop user services
 stop_service tiny-dfr
@@ -611,41 +602,33 @@ t2_log "Turning off keyboard backlight..."
 /usr/bin/brightnessctl -sd :white:kbd_backlight set 0 -q 2>/dev/null || true
 t2_log "OK: keyboard backlight off"
 
-# Unload WiFi / Bluetooth
+# Unload WiFi
 unload_mod brcmfmac_wcc
-unload_mod brcmfmac
 unload_mod brcmutil
 
 # Unload Touchbar
 unload_mod hid_appletb_bl
 unload_mod hid_appletb_kbd
 unload_mod appletbdrm
-unload_mod sparse_keymap
 
 # Unload Sensors
 unload_mod hid_sensor_als
 unload_mod hid_sensor_rotation
-unload_mod hid_sensor_trigger
 unload_mod hid_sensor_iio_common
-unload_mod hid_sensor_hub
 unload_mod industrialio_triggered_buffer
-unload_mod kfifo_buf
 unload_mod industrialio
-
-# Unload Apple GMUX
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Turn off internal display before unloading gmux
 /usr/local/bin/drm-display-off.sh
 
+# Unload Apple GMUX
 unload_mod apple_gmux
 
 # Unload Apple BCE
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 unload_mod apple_bce
 
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 t2_log "Suspend complete, ready to sleep"
+lsmod_log
 SUSPEND_EOF
 sudo chmod +x /usr/local/bin/t2-suspend.sh
 echo -e "${GREEN}Done${NC}"
@@ -654,15 +637,23 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating resume script..."
 sudo tee /usr/local/bin/t2-resume.sh > /dev/null << 'RESUME_EOF'
 #!/bin/sh
+LOG_FILE="/var/log/t2-suspend-fix.log"
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][resume] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
+}
+lsmod_log() {
+    lsmod | grep -E 'apple|bcm|brcm|industrialio|kfifo|sensor|sparse' >> "$LOG_FILE" 2>/dev/null || true
 }
 
 load_mod() {
     local mod="$1"
-    t2_log "Loading $mod..."
-    /usr/bin/modprobe "$mod" 2>/dev/null || true
-    lsmod | grep "^${mod}" >/dev/null && t2_log "OK: $mod loaded" || t2_log "ERROR: $mod not loaded"
+    if lsmod | grep -q "^${mod}"; then
+        t2_log "No load needed for $mod"
+    else
+        t2_log "Loading $mod..."
+        /usr/bin/modprobe "$mod" 2>/dev/null || true
+        lsmod | grep "^${mod}" >/dev/null && t2_log "OK: $mod loaded" || t2_log "ERROR: $mod not loaded"
+    fi
 }
 
 start_service() {
@@ -681,14 +672,12 @@ start_service() {
 }
 
 t2_log "Starting resume..."
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
+lsmod_log
 
 # Load Apple BCE
 load_mod apple_bce
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Load Apple GMUX
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 load_mod apple_gmux
 
 # Fix DRM display (turn off then on)
@@ -697,21 +686,15 @@ load_mod apple_gmux
 
 # Load Sensors
 load_mod industrialio
-load_mod kfifo_buf
-load_mod hid_sensor_hub
-load_mod hid_sensor_iio_common
-load_mod hid_sensor_trigger
 load_mod hid_sensor_rotation
-load_mod hid_sensor_als
 
-# Load WiFi / Bluetooth
+# Load WiFi
 load_mod brcmutil
 load_mod brcmfmac
 load_mod brcmfmac_wcc
 
 # Wait for BCE to bring up dependencies
 /usr/local/bin/t2-wait-apple-bce.sh
-# lsmod | grep -E 'apple|brcm|bcm' >> "$LOG_FILE" 2>/dev/null || true
 
 # Turn on keyboard backlight
 /usr/local/bin/fix-kbd-backlight.sh
@@ -727,6 +710,7 @@ start_service t2fanrd
 start_service tiny-dfr
 
 t2_log "Resume complete"
+lsmod_log
 RESUME_EOF
 sudo chmod +x /usr/local/bin/t2-resume.sh
 echo -e "${GREEN}Done${NC}"
