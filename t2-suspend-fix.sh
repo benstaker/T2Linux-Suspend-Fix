@@ -107,19 +107,6 @@ if [ "$MODE" = "uninstall" ]; then
         echo "  - No override.conf backup found. Skipping restore."
     fi
 
-    # Update GRUB if possible after restore
-    if [ "$GRUB_RESTORED" = true ]; then
-        echo "  - Updating GRUB..."
-        if command -v update-grub &> /dev/null; then
-            sudo update-grub
-        elif command -v grub-mkconfig &> /dev/null; then
-            if [ -f /boot/grub/grub.cfg ]; then
-                sudo grub-mkconfig -o /boot/grub/grub.cfg
-            fi
-        fi
-        echo "  - GRUB update complete."
-    fi
-
     echo "  - Reloading systemd..."
     sudo systemctl daemon-reload
 
@@ -610,13 +597,8 @@ sudo systemctl enable fix-kbd-backlight.service
 sudo systemctl enable fix-gmux-display.service
 echo -e "${GREEN}Done${NC}"
 
-# Configure deep suspend mode
-echo -e "\n${YELLOW}NOTE${NC}: For deep suspend to work properly, add the following kernel parameters to your bootloader:"
-echo ""
-echo "  For rEFInd (/boot/refind_linux.conf or /boot/efi/EFI/refind/refind.conf):"
-echo "    add: mem_sleep_default=deep pcie_aspm=off"
-echo ""
-echo "  The above kernel parameters are required for suspend/resume to work properly on T2 Macs."
+# Kernel parameters info
+echo -e "\n${YELLOW}NOTE${NC}: See README.md for more information on modifying kernel parameters."
 
 # Remove override.conf
 echo -e "\n${YELLOW}⚙${NC} Checking for override.conf..."
