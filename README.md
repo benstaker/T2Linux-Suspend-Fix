@@ -19,7 +19,6 @@ Forked and inspired by:
 
 ### Kernel arguments:
 
-- `intel_pstate=disable`
 - `i915.enable_guc=3`
 - `mem_sleep_default=deep`
 - `pcie_aspm=off`
@@ -61,3 +60,4 @@ Forked and inspired by:
 3. Tried using [deqrocks/apple-bce-drv](https://github.com/deqrocks/apple-bce-drv), however this caused issues with the touchbar working after waking.
 4. Putting the laptop to sleep whilst USB-C charging prevents the touchbar waking up - unplugging and then suspending / waking fixes this.
 5. Plugging in a USB-C charger whilst the lid is closed prevents the touchbar waking up - unplugging and then suspending / waking fixes this.
+6. Using `intel_pstate=disable` to disable intel's governor slows waking by a lot.
