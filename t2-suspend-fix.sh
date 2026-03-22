@@ -203,21 +203,46 @@ t2_log() {
 }
 t2_log "Starting DRM display off..."
 
-CARD="/sys/class/drm/card2-eDP-1"
-[ -f "$CARD/status" ] || exit 0
-if grep -q "connected" "$CARD/status" 2>/dev/null; then
-    t2_log "Turning off $CARD"
-    for i in $(seq 1 10); do
-        echo off > "$CARD/status" 2>/dev/null
-        STATUS=$(cat "$CARD/status" 2>/dev/null)
-        if [ "$STATUS" = "disconnected" ]; then
-            t2_log "OK: $CARD off after $i/10 attempts"
-            exit 0
+turn_off_display() {
+    local conn="$1"
+    local path="/sys/class/drm/${conn}"
+    [ -f "$path/status" ] || return 0
+    if grep -q "connected" "$path/status" 2>/dev/null; then
+        t2_log "Turning off $path"
+        for i in $(seq 1 10); do
+            echo off > "$path/status" 2>/dev/null
+            STATUS=$(cat "$path/status" 2>/dev/null)
+            if [ "$STATUS" = "disconnected" ]; then
+                t2_log "OK: $path off after $i/10 attempts"
+                return 0
+            fi
+            sleep 0.5
+        done
+        t2_log "ERROR: failed to turn off $path"
+    fi
+    return 0
+}
+
+INTEL_CONN="" AMD_CONN=""
+for card in /sys/class/drm/card[0-9]*; do
+    driver=$(cat "$card/device/uevent" 2>/dev/null | grep "^DRIVER=" | cut -d= -f2)
+    for conn in "$card"/*-eDP-*; do
+        if [ -f "$conn/status" ] && grep -q "connected" "$conn/status" 2>/dev/null; then
+            connname=$(basename "$conn")
+            if [ "$driver" = "i915" ]; then
+                INTEL_CONN="$connname"
+                t2_log "Found Intel eDP: $connname"
+            elif [ "$driver" = "amdgpu" ]; then
+                AMD_CONN="$connname"
+                t2_log "Found AMD eDP: $connname"
+            fi
         fi
-        sleep 0.5
     done
-    t2_log "ERROR: failed to turn off $CARD"
-fi
+done
+
+[ -n "$AMD_CONN" ] && turn_off_display "$AMD_CONN"
+[ -n "$INTEL_CONN" ] && turn_off_display "$INTEL_CONN"
+
 exit 0
 EOF
 sudo chmod +x /usr/local/bin/drm-display-off.sh
@@ -232,21 +257,47 @@ t2_log() {
 }
 t2_log "Starting DRM display on..."
 
-CARD="/sys/class/drm/card2-eDP-1"
-[ -f "$CARD/status" ] || exit 0
-if grep -q "disconnected" "$CARD/status" 2>/dev/null; then
-    t2_log "Turning on $CARD"
-    for i in $(seq 1 10); do
-        echo on > "$CARD/status" 2>/dev/null
-        STATUS=$(cat "$CARD/status" 2>/dev/null)
-        if [ "$STATUS" = "connected" ]; then
-            t2_log "OK: $CARD on after $i/10 attempts"
-            exit 0
+turn_on_display() {
+    local conn="$1"
+    local path="/sys/class/drm/${conn}"
+    [ -f "$path/status" ] || return 0
+    if grep -q "disconnected" "$path/status" 2>/dev/null; then
+        t2_log "Turning on $path"
+        for i in $(seq 1 10); do
+            echo on > "$path/status" 2>/dev/null
+            STATUS=$(cat "$path/status" 2>/dev/null)
+            if [ "$STATUS" = "connected" ]; then
+                t2_log "OK: $path on after $i/10 attempts"
+                return 0
+            fi
+            sleep 0.5
+        done
+        t2_log "ERROR: failed to turn on $path"
+    fi
+    return 0
+}
+
+INTEL_CONN="" AMD_CONN=""
+for card in /sys/class/drm/card[0-9]*; do
+    driver=$(cat "$card/device/uevent" 2>/dev/null | grep "^DRIVER=" | cut -d= -f2)
+    for conn in "$card"/*-eDP-*; do
+        if [ -f "$conn/status" ] && grep -q "disconnected" "$conn/status" 2>/dev/null; then
+            connname=$(basename "$conn")
+            if [ "$driver" = "i915" ]; then
+                INTEL_CONN="$connname"
+                t2_log "Found Intel eDP: $connname"
+            elif [ "$driver" = "amdgpu" ]; then
+                AMD_CONN="$connname"
+                t2_log "Found AMD eDP: $connname"
+            fi
         fi
-        sleep 0.5
     done
-    t2_log "ERROR: failed to turn on $CARD"
-fi
+done
+
+# Turn on Intel (primary) first
+[ -n "$INTEL_CONN" ] && turn_on_display "$INTEL_CONN"
+[ -n "$AMD_CONN" ] && turn_on_display "$AMD_CONN"
+
 exit 0
 EOF
 sudo chmod +x /usr/local/bin/drm-display-on.sh
@@ -522,9 +573,7 @@ start_service tiny-dfr
 
 # Fix DRM display
 /usr/local/bin/drm-display-off.sh
-sleep 0.5
 /usr/local/bin/drm-display-on.sh
-sleep 0.5
 /usr/local/bin/fix-gmux-backlight.sh
 
 t2_log "Resume complete"
