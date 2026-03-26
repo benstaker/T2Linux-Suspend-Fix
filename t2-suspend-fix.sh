@@ -29,14 +29,20 @@ fi
 
 MODE="install"
 echo -e "${YELLOW}Select action:${NC}"
-echo "1) Install"
-echo "2) Uninstall"
-read -p "Choose [1-2]: " -n 1 -r
+echo "1) Install suspend fix"
+echo "2) Uninstall suspend fix"
+echo "3) Install apple-bce driver (no-state-suspend branch)"
+echo "4) Uninstall apple-bce driver"
+read -p "Choose [1-4]: " -n 1 -r
 echo
 if [[ $REPLY =~ ^[2]$ ]]; then
     MODE="uninstall"
 elif [[ $REPLY =~ ^[1]$ ]]; then
     MODE="install"
+elif [[ $REPLY =~ ^[3]$ ]]; then
+    MODE="install-apple-bce"
+elif [[ $REPLY =~ ^[4]$ ]]; then
+    MODE="uninstall-apple-bce"
 else
     echo -e "${RED}Invalid selection.${NC}"
     exit 1
@@ -90,6 +96,142 @@ if [ "$MODE" = "uninstall" ]; then
 
     echo -e "${GREEN}Uninstall complete.${NC}"
 
+    exit 0
+fi
+
+# Install apple-bce driver
+if [ "$MODE" = "install-apple-bce" ]; then
+    echo -e "${YELLOW}⚙${NC} Installing apple-bce driver (no-state-suspend branch)..."
+    
+    BUILD_DIR="/tmp/apple-bce-build"
+    
+    # Clean up any previous build
+    sudo rm -rf "$BUILD_DIR"
+    
+    # Clone repository
+    echo "  - Cloning apple-bce repository..."
+    if ! git clone https://github.com/deqrocks/apple-bce.git "$BUILD_DIR"; then
+        echo -e "${RED}Error: Failed to clone repository${NC}"
+        exit 1
+    fi
+    
+    cd "$BUILD_DIR"
+    
+    # Checkout no-state-suspend branch
+    echo "  - Checking out no-state-suspend branch..."
+    if ! git checkout no-state-suspend; then
+        echo -e "${RED}Error: Failed to checkout no-state-suspend branch${NC}"
+        exit 1
+    fi
+    
+    # Detect kernel compiler
+    echo "  - Detecting kernel compiler..."
+    KERNEL_COMPILER=""
+    LD_COMPILER=""
+    if grep -q "clang" /proc/version; then
+        KERNEL_COMPILER="clang"
+        LD_COMPILER="ld.lld"
+        echo "    Kernel built with clang"
+    elif grep -q "gcc" /proc/version; then
+        KERNEL_COMPILER="gcc"
+        LD_COMPILER="ld"
+        echo "    Kernel built with gcc"
+    else
+        echo "    Could not detect kernel compiler, assuming gcc"
+        KERNEL_COMPILER="gcc"
+        LD_COMPILER="ld"
+    fi
+    
+    # Build module with detected compiler
+    echo "  - Building module..."
+    if ! make CC="$KERNEL_COMPILER" LD="$LD_COMPILER" -j$(nproc); then
+        echo -e "${RED}Error: Failed to build module${NC}"
+        exit 1
+    fi
+    
+    # Install module
+    echo "  - Installing module..."
+    if ! sudo make install; then
+        echo -e "${RED}Error: Failed to install module${NC}"
+        exit 1
+    fi
+    
+    # Update module dependencies
+    echo "  - Updating module dependencies..."
+    sudo depmod -a
+    
+    # Rebuild initramfs (for both mkinitcpio and update-initramfs)
+    echo "  - Rebuilding initramfs..."
+    if command -v mkinitcpio >/dev/null 2>&1; then
+        sudo mkinitcpio -P
+    elif command -v update-initramfs >/dev/null 2>&1; then
+        sudo update-initramfs -u
+    else
+        echo -e "${YELLOW}Warning: Could not rebuild initramfs (neither mkinitcpio nor update-initramfs found)${NC}"
+    fi
+    
+    # Clean up
+    cd -
+    sudo rm -rf "$BUILD_DIR"
+    
+    echo -e "${GREEN}apple-bce driver installed successfully.${NC}"
+    echo -e "${YELLOW}NOTE: Reboot required to load the new driver.${NC}"
+    
+    exit 0
+fi
+
+# Uninstall apple-bce driver
+if [ "$MODE" = "uninstall-apple-bce" ]; then
+    echo -e "${YELLOW}⚙${NC} Uninstalling apple-bce driver..."
+    
+    BUILD_DIR="/tmp/apple-bce-build"
+    
+    # Try to use make uninstall if build directory exists
+    if [ -d "$BUILD_DIR" ] && [ -f "$BUILD_DIR/Makefile" ]; then
+        echo "  - Attempting make uninstall..."
+        cd "$BUILD_DIR"
+        sudo make uninstall 2>/dev/null || true
+        cd - >/dev/null
+    fi
+    
+    # Find and remove only from updates directory (where make install puts out-of-tree modules)
+    # Do NOT remove from kernel/drivers/staging (those are kernel's built-in drivers)
+    echo "  - Searching for out-of-tree module files in updates directories..."
+    MODULE_FILES=$(find /lib/modules -path "*/updates/*" -type f \( -name "apple-bce.ko*" -o -name "apple_bce.ko*" \) 2>/dev/null)
+    
+    if [ -z "$MODULE_FILES" ]; then
+        echo -e "${YELLOW}No out-of-tree apple-bce module files found in updates directories${NC}"
+        exit 0
+    fi
+    
+    # Remove all found module files
+    echo "  - Removing out-of-tree module files..."
+    echo "$MODULE_FILES" | while read -r file; do
+        echo "    Removing: $file"
+        sudo rm -f "$file"
+    done
+    
+    # Update module dependencies
+    echo "  - Updating module dependencies..."
+    sudo depmod -a
+    
+    # Rebuild initramfs
+    echo "  - Rebuilding initramfs..."
+    if command -v mkinitcpio >/dev/null 2>&1; then
+        sudo mkinitcpio -P
+    elif command -v update-initramfs >/dev/null 2>&1; then
+        sudo update-initramfs -u
+    fi
+    
+    # Clean up build directory
+    if [ -d "$BUILD_DIR" ]; then
+        echo "  - Cleaning up build directory..."
+        sudo rm -rf "$BUILD_DIR"
+    fi
+    
+    echo -e "${GREEN}apple-bce driver uninstalled.${NC}"
+    echo -e "${YELLOW}NOTE: Reboot required to unload the driver completely.${NC}"
+    
     exit 0
 fi
 
@@ -422,7 +564,15 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating 't2-suspend.sh' script..."
 sudo tee /usr/local/bin/t2-suspend.sh > /dev/null << 'SUSPEND_EOF'
 #!/bin/sh
+
+APPLE_BCE_RELOAD=true # Unloads and reloads apple_bce module
+APPLE_GMUX_RELOAD=true # Unloads and reloads apple_gmux module
+SENSORS_RELOAD=true # Unloads and reloads sensor driver modules
+TOUCHBAR_RELOAD=true # Unloads and reloads touchbar driver modules
+WIFI_RELOAD=true # Unloads and reloads WiFi driver modules
+
 LOG_FILE="/var/log/t2-suspend-fix.log"
+
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][suspend] $*" >> "$LOG_FILE" 2>/dev/null || true
 }
@@ -472,29 +622,41 @@ t2_log "Turning off keyboard backlight..."
 t2_log "OK: keyboard backlight off"
 
 # Unload WiFi
-unload_mod brcmfmac_wcc
-unload_mod brcmutil
+if [ "$WIFI_RELOAD" = true ]; then
+    unload_mod brcmfmac_wcc
+    unload_mod brcmutil
+fi
 
 # Unload Touchbar
-unload_mod hid_appletb_bl
-unload_mod hid_appletb_kbd
-unload_mod appletbdrm
+if [ "$TOUCHBAR_RELOAD" = true ]; then
+    unload_mod hid_appletb_bl
+    unload_mod hid_appletb_kbd
+    unload_mod appletbdrm
+fi
 
 # Unload Sensors
-unload_mod hid_sensor_als
-unload_mod hid_sensor_rotation
-unload_mod hid_sensor_iio_common
-unload_mod industrialio_triggered_buffer
-unload_mod industrialio
+if [ "$SENSORS_RELOAD" = true ]; then
+    unload_mod hid_sensor_als
+    unload_mod hid_sensor_rotation
+    unload_mod hid_sensor_iio_common
+    unload_mod industrialio_triggered_buffer
+    unload_mod industrialio
+fi
 
 # Turn off internal display before unloading gmux
-/usr/local/bin/drm-display-off.sh
+if [ "$APPLE_GMUX_RELOAD" = true ]; then
+    /usr/local/bin/drm-display-off.sh
+fi
 
 # Unload Apple GMUX
-unload_mod apple_gmux
+if [ "$APPLE_GMUX_RELOAD" = true ]; then
+    unload_mod apple_gmux
+fi
 
 # Unload Apple BCE
-unload_mod apple_bce
+if [ "$APPLE_BCE_RELOAD" = true ]; then
+    unload_mod apple_bce
+fi
 
 t2_log "Suspend complete, ready to sleep"
 lsmod_log
@@ -506,7 +668,15 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating 't2-resume.sh' script..."
 sudo tee /usr/local/bin/t2-resume.sh > /dev/null << 'RESUME_EOF'
 #!/bin/sh
+
+APPLE_BCE_RELOAD=true # Unloads and reloads apple_bce module
+APPLE_GMUX_RELOAD=true # Unloads and reloads apple_gmux module
+SENSORS_RELOAD=true # Unloads and reloads sensor driver modules
+TOUCHBAR_RELOAD=true # Unloads and reloads touchbar driver modules
+WIFI_RELOAD=true # Unloads and reloads WiFi driver modules
+
 LOG_FILE="/var/log/t2-suspend-fix.log"
+
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][resume] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
@@ -544,21 +714,29 @@ t2_log "Starting resume..."
 lsmod_log
 
 # Load Apple BCE
-load_mod apple_bce
+if [ "$APPLE_BCE_RELOAD" = true ]; then
+    load_mod apple_bce
+fi
 
 # Load Apple GMUX
-load_mod apple_gmux
+if [ "$APPLE_GMUX_RELOAD" = true ]; then
+    load_mod apple_gmux
+fi
 
 # Load Sensors
-load_mod industrialio
-load_mod hid_sensor_rotation
+if [ "$SENSORS_RELOAD" = true ]; then
+    load_mod industrialio
+    load_mod hid_sensor_rotation
+fi
 
 # Load WiFi
-load_mod brcmutil
-load_mod brcmfmac
-load_mod brcmfmac_wcc
+if [ "$WIFI_RELOAD" = true ]; then
+    load_mod brcmutil
+    load_mod brcmfmac
+    load_mod brcmfmac_wcc
+fi
 
-# Wait for BCE to bring up dependencies
+# Wait for touchbar modules
 /usr/local/bin/t2-wait-apple-bce.sh
 
 # Turn on keyboard backlight
@@ -572,9 +750,11 @@ start_service t2fanrd
 start_service tiny-dfr
 
 # Fix DRM display
-/usr/local/bin/drm-display-off.sh
-/usr/local/bin/drm-display-on.sh
-/usr/local/bin/fix-gmux-backlight.sh
+if [ "$APPLE_GMUX_RELOAD" = true ]; then
+    /usr/local/bin/drm-display-off.sh
+    /usr/local/bin/drm-display-on.sh
+    /usr/local/bin/fix-gmux-backlight.sh
+fi 
 
 t2_log "Resume complete"
 lsmod_log
