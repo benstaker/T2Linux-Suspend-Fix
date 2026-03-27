@@ -88,6 +88,8 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
     sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
     sudo rm -f /usr/local/bin/t2-wait-brcmfmac.sh
+    sudo rm -f /usr/local/bin/t2-suspend.sh
+    sudo rm -f /usr/local/bin/t2-resume.sh
     sudo rm -f /usr/local/bin/fix-kbd-backlight.sh
     sudo rm -f /usr/local/bin/fix-gmux-backlight.sh
     sudo rm -f /usr/local/bin/drm-display-off.sh
