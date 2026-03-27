@@ -640,6 +640,13 @@ unload_mod() {
 stop_service() {
     local svc="$1"
     t2_log "Stopping $svc..."
+    
+    # Check if service exists
+    if ! systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}.service"; then
+        t2_log "SKIP: $svc not installed"
+        return 0
+    fi
+    
     systemctl stop "$svc" --no-block 2>/dev/null || true
     for i in $(seq 1 20); do
         if ! systemctl is-active "$svc" >/dev/null 2>&1; then
@@ -744,6 +751,13 @@ load_mod() {
 start_service() {
     local svc="$1"
     t2_log "Starting $svc..."
+    
+    # Check if service exists
+    if ! systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}.service"; then
+        t2_log "SKIP: $svc not installed"
+        return 0
+    fi
+    
     systemctl start "$svc" --no-block 2>/dev/null || true
     for i in $(seq 1 20); do
         if systemctl is-active "$svc" >/dev/null 2>&1; then
