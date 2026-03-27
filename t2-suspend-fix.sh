@@ -520,8 +520,8 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][stop-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
 
-# Check if PipeWire is installed
-if ! systemctl --user list-unit-files pipewire.socket 2>/dev/null | grep -q pipewire; then
+# Check if PipeWire is installed (check for binary, since we run as root from system service)
+if ! command -v pipewire >/dev/null 2>&1; then
     t2_log "SKIP: PipeWire not found (not installed)"
     exit 0
 fi
@@ -555,8 +555,8 @@ t2_log() {
 }
 # t2_log "Starting PipeWire audio session..."
 
-# Check if PipeWire is installed
-if ! systemctl --user list-unit-files pipewire.socket 2>/dev/null | grep -q pipewire; then
+# Check if PipeWire is installed (check for binary, since we run as root from system service)
+if ! command -v pipewire >/dev/null 2>&1; then
     t2_log "SKIP: PipeWire not found (not installed)"
     exit 0
 fi
