@@ -49,6 +49,12 @@ else
 fi
 
 if [ "$MODE" = "uninstall" ]; then
+    read -p "Continue with uninstall? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "  - uninstall cancelled."
+        exit 0
+    fi
     echo -e "${YELLOW}⚙${NC} Uninstalling..."
 
     # Disable and remove (previous) fixes
@@ -101,6 +107,12 @@ fi
 
 # Install apple-bce driver
 if [ "$MODE" = "install-apple-bce" ]; then
+    read -p "Continue with install-apple-bce? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "  - install-apple-bce cancelled."
+        exit 0
+    fi
     echo -e "${YELLOW}⚙${NC} Installing apple-bce driver (no-state-suspend branch)..."
     
     BUILD_DIR="/tmp/apple-bce-build"
@@ -182,6 +194,12 @@ fi
 
 # Uninstall apple-bce driver
 if [ "$MODE" = "uninstall-apple-bce" ]; then
+    read -p "Continue with uninstall-apple-bce? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "  - uninstall-apple-bce cancelled."
+        exit 0
+    fi
     echo -e "${YELLOW}⚙${NC} Uninstalling apple-bce driver..."
     
     BUILD_DIR="/tmp/apple-bce-build"
@@ -236,10 +254,10 @@ if [ "$MODE" = "uninstall-apple-bce" ]; then
 fi
 
 # Confirm with user
-read -p "Continue with installation? (y/n) " -n 1 -r
+read -p "Continue with install? (y/n) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Installation cancelled."
+    echo "  - install cancelled."
     exit 0
 fi
 
