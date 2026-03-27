@@ -59,6 +59,15 @@ if [ "$MODE" = "uninstall" ]; then
     fi
     echo -e "${YELLOW}⚙${NC} Uninstalling..."
 
+    # Stop and disable user service for all logged-in users
+    echo "  - Stopping user services..."
+    for user in $(awk -F: '$3 >= 1000 && $3 < 60000 {print $1}' /etc/passwd); do
+        uid=$(id -u "$user" 2>/dev/null) || continue
+        if [ -S "/run/user/$uid/bus" ]; then
+            sudo -u "$user" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop kbd-backlight-auto.service 2>/dev/null || true
+        fi
+    done
+
     # Disable and remove (previous) fixes
     echo "  - Disabling services..."
     sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
@@ -72,6 +81,7 @@ if [ "$MODE" = "uninstall" ]; then
     sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
     sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
     sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
+    sudo systemctl disable --global kbd-backlight-auto.service 2>/dev/null || true
     echo "  - Services disabled."
 
     echo "  - Removing unit files and scripts..."
@@ -97,8 +107,10 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /usr/local/bin/enable-wakeup-devices.sh
     sudo rm -f /usr/local/bin/t2-stop-audio.sh
     sudo rm -f /usr/local/bin/t2-start-audio.sh
+    sudo rm -f /usr/local/bin/kbd-backlight-auto.sh
     sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
     sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
+    sudo rm -f /etc/xdg/systemd/user/kbd-backlight-auto.service
     echo "  - Unit files and scripts removed."
 
     echo "  - Reloading systemd..."
@@ -857,6 +869,59 @@ ExecStart=/usr/local/bin/t2-resume.sh
 [Install]
 WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
 EOF
+echo -e "${GREEN}Done${NC}"
+
+# Create keyboard backlight auto-off components
+echo -e "\n${YELLOW}⚙${NC} Creating keyboard backlight auto-off service..."
+
+echo "  - Creating keyboard backlight auto script..."
+sudo tee /usr/local/bin/kbd-backlight-auto.sh > /dev/null << 'EOF'
+#!/bin/bash
+
+LOG_FILE="/var/log/t2-suspend-fix.log"
+BACKLIGHT_DEVICE=":white:kbd_backlight"
+IDLE_LIMIT=10
+
+t2_log() {
+    echo "[$(date +%Y_%m_%d-%H:%M:%S)][kbd-auto] $*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+t2_log "Starting keyboard backlight auto-off service (idle limit: ${IDLE_LIMIT}s)"
+
+# Check if running under Wayland
+if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
+    t2_log "ERROR: No display session found"
+    exit 1
+fi
+
+# Use swayidle to monitor idle time and control backlight
+swayidle -w \
+    timeout ${IDLE_LIMIT} '/usr/bin/brightnessctl -d :white:kbd_backlight set 0 -q && t2_log "Backlight turned off (idle)"' \
+    resume '/usr/bin/brightnessctl -d :white:kbd_backlight set 10% -q && t2_log "Backlight restored (activity)"'
+EOF
+sudo chmod +x /usr/local/bin/kbd-backlight-auto.sh
+
+echo "  - Creating systemd user service..."
+sudo mkdir -p /etc/xdg/systemd/user
+sudo tee /etc/xdg/systemd/user/kbd-backlight-auto.service > /dev/null << 'EOF'
+[Unit]
+Description=Keyboard Backlight Auto-off Service
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/kbd-backlight-auto.sh
+Restart=always
+RestartSec=5
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target
+EOF
+
+echo "  - Enabling service..."
+sudo systemctl enable --global kbd-backlight-auto.service
+
 echo -e "${GREEN}Done${NC}"
 
 # Activate services
