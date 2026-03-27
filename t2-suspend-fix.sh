@@ -27,6 +27,7 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+# Prompt for mode
 MODE="install"
 echo -e "${YELLOW}Select action:${NC}"
 echo "1) Install suspend fix"
@@ -49,6 +50,7 @@ else
 fi
 
 if [ "$MODE" = "uninstall" ]; then
+    # Confirm with user
     read -p "Continue with uninstall? (y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -107,6 +109,12 @@ fi
 
 # Install apple-bce driver
 if [ "$MODE" = "install-apple-bce" ]; then
+    # Ensure commands available
+    command -v git >/dev/null 2>&1 || { t2_log "ERROR: git not found"; exit 1; }
+    command -v make >/dev/null 2>&1 || { t2_log "ERROR: make not found"; exit 1; }
+    command -v nproc >/dev/null 2>&1 || { t2_log "ERROR: nproc not found"; exit 1; }
+    
+    # Confirm with user
     read -p "Continue with install-apple-bce? (y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -194,6 +202,7 @@ fi
 
 # Uninstall apple-bce driver
 if [ "$MODE" = "uninstall-apple-bce" ]; then
+    # Confirm with user
     read -p "Continue with uninstall-apple-bce? (y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -252,6 +261,11 @@ if [ "$MODE" = "uninstall-apple-bce" ]; then
     
     exit 0
 fi
+
+# Ensure commands available
+command -v brightnessctl >/dev/null 2>&1 || { t2_log "ERROR: brightnessctl not found"; exit 1; }
+command -v swayidle >/dev/null 2>&1 || { t2_log "ERROR: swayidle not found"; exit 1; }
+command -v wpctl >/dev/null 2>&1 || { t2_log "ERROR: wpctl not found"; exit 1; }
 
 # Confirm with user
 read -p "Continue with install? (y/n) " -n 1 -r
