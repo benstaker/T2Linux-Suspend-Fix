@@ -314,7 +314,7 @@ sudo tee /usr/local/bin/fix-kbd-backlight.sh > /dev/null << 'EOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][kbd-bl] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Starting keyboard backlight fix..."
+# t2_log "Starting keyboard backlight fix..."
 
 for i in $(seq 1 10); do
     SET_OUTPUT=$(brightnessctl -d :white:kbd_backlight set 10% 2>&1)
@@ -361,7 +361,7 @@ sudo tee /usr/local/bin/fix-gmux-backlight.sh > /dev/null << 'EOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][gmux-bl] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Starting gmux backlight fix..."
+# t2_log "Starting gmux backlight fix..."
 
 for i in $(seq 1 10); do
     SET_OUTPUT=$(brightnessctl -d gmux_backlight set 10% 2>&1)
@@ -389,14 +389,14 @@ sudo tee /usr/local/bin/drm-display-off.sh > /dev/null << 'EOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][drm-off] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Starting DRM display off..."
+# t2_log "Starting DRM display off..."
 
 turn_off_display() {
     local conn="$1"
     local path="/sys/class/drm/${conn}"
     [ -f "$path/status" ] || return 0
     if grep -q "connected" "$path/status" 2>/dev/null; then
-        t2_log "Turning off $path"
+        # t2_log "Turning off $path"
         for i in $(seq 1 10); do
             echo off > "$path/status" 2>/dev/null
             STATUS=$(cat "$path/status" 2>/dev/null)
@@ -443,14 +443,14 @@ sudo tee /usr/local/bin/drm-display-on.sh > /dev/null << 'EOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][drm-on] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Starting DRM display on..."
+# t2_log "Starting DRM display on..."
 
 turn_on_display() {
     local conn="$1"
     local path="/sys/class/drm/${conn}"
     [ -f "$path/status" ] || return 0
     if grep -q "disconnected" "$path/status" 2>/dev/null; then
-        t2_log "Turning on $path"
+        # t2_log "Turning on $path"
         for i in $(seq 1 10); do
             echo on > "$path/status" 2>/dev/null
             STATUS=$(cat "$path/status" 2>/dev/null)
@@ -498,7 +498,7 @@ sudo tee /usr/local/bin/t2-wait-apple-bce.sh > /dev/null << 'EOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][wait-bce] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Starting wait for appletbdrm in lsmod..."
+# t2_log "Starting wait for appletbdrm in lsmod..."
 for i in $(seq 1 30); do
     if lsmod | grep -q "^appletbdrm"; then
         t2_log "OK: appletbdrm found in lsmod (attempt $i/15)"
@@ -519,7 +519,6 @@ sudo tee /usr/local/bin/t2-stop-audio.sh > /dev/null << 'AUDIOEOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][stop-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Stopping PipeWire audio session..."
 
 # Check if PipeWire is installed
 if ! systemctl --user list-unit-files pipewire.socket 2>/dev/null | grep -q pipewire; then
@@ -537,12 +536,12 @@ if [ ! -S "/run/user/$uid/bus" ]; then
     exit 0
 fi
 username=$(id -nu "$uid" 2>/dev/null) || exit 0
+t2_log "Stopping PipeWire for user $username (uid=$uid)..."
 XDG_RUNTIME_DIR="/run/user/$uid" \
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     runuser -u "$username" -- \
     systemctl --user stop pipewire.socket pipewire-pulse.socket \
         pipewire.service pipewire-pulse.service wireplumber.service 2>/dev/null
-t2_log "OK: PipeWire stopped for user $username"
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-stop-audio.sh
@@ -554,7 +553,7 @@ sudo tee /usr/local/bin/t2-start-audio.sh > /dev/null << 'AUDIOEOF'
 t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][start-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
-t2_log "Starting PipeWire audio session..."
+# t2_log "Starting PipeWire audio session..."
 
 # Check if PipeWire is installed
 if ! systemctl --user list-unit-files pipewire.socket 2>/dev/null | grep -q pipewire; then
@@ -643,7 +642,7 @@ lsmod_log() {
 unload_mod() {
     local mod="$1"
     if lsmod | grep -q "^${mod}"; then
-        t2_log "Unloading $mod..."
+        # t2_log "Unloading $mod..."
         /usr/bin/modprobe -r "$mod" 2>/dev/null || true
         lsmod | grep "^${mod}" >/dev/null && t2_log "ERROR: $mod still loaded" || t2_log "OK: $mod unloaded"
     else
@@ -653,7 +652,7 @@ unload_mod() {
 
 stop_service() {
     local svc="$1"
-    t2_log "Stopping $svc..."
+    # t2_log "Stopping $svc..."
     
     # Check if service exists
     if ! systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}.service"; then
@@ -674,7 +673,7 @@ stop_service() {
 }
 
 t2_log "Starting suspend sequence..."
-lsmod_log
+# lsmod_log
 
 # Stop user services
 stop_service tiny-dfr
@@ -686,7 +685,6 @@ stop_service t2fanrd
 # Turn off keyboard backlight
 t2_log "Turning off keyboard backlight..."
 /usr/bin/brightnessctl -sd :white:kbd_backlight set 0 -q 2>/dev/null || true
-t2_log "OK: keyboard backlight off"
 
 # Unload WiFi
 if [ "$WIFI_RELOAD" = true ]; then
@@ -726,7 +724,7 @@ if [ "$APPLE_BCE_RELOAD" = true ]; then
 fi
 
 t2_log "Suspend complete, ready to sleep"
-lsmod_log
+# lsmod_log
 SUSPEND_EOF
 sudo chmod +x /usr/local/bin/t2-suspend.sh
 echo -e "${GREEN}Done${NC}"
@@ -756,7 +754,7 @@ load_mod() {
     if lsmod | grep -q "^${mod}"; then
         t2_log "No load needed for $mod"
     else
-        t2_log "Loading $mod..."
+        # t2_log "Loading $mod..."
         /usr/bin/modprobe "$mod" 2>/dev/null || true
         lsmod | grep "^${mod}" >/dev/null && t2_log "OK: $mod loaded" || t2_log "ERROR: $mod not loaded"
     fi
@@ -764,7 +762,7 @@ load_mod() {
 
 start_service() {
     local svc="$1"
-    t2_log "Starting $svc..."
+    # t2_log "Starting $svc..."
     
     # Check if service exists
     if ! systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}.service"; then
@@ -785,7 +783,7 @@ start_service() {
 }
 
 t2_log "Starting resume..."
-lsmod_log
+# lsmod_log
 
 # Load Apple BCE
 if [ "$APPLE_BCE_RELOAD" = true ]; then
@@ -831,7 +829,7 @@ if [ "$APPLE_GMUX_RELOAD" = true ]; then
 fi 
 
 t2_log "Resume complete"
-lsmod_log
+# lsmod_log
 RESUME_EOF
 sudo chmod +x /usr/local/bin/t2-resume.sh
 echo -e "${GREEN}Done${NC}"
@@ -886,8 +884,6 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][kbd-auto] $*" >> "$LOG_FILE" 2>/dev/null || true
 }
 
-t2_log "Starting keyboard backlight auto-off service (idle limit: ${IDLE_LIMIT}s)"
-
 # Check if running under Wayland
 if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
     t2_log "ERROR: No display session found"
@@ -895,6 +891,7 @@ if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
 fi
 
 # Use swayidle to monitor idle time and control backlight
+t2_log "Starting keyboard backlight auto-off service (idle limit: ${IDLE_LIMIT}s)"
 swayidle -w \
     timeout ${IDLE_LIMIT} '/usr/bin/brightnessctl -d :white:kbd_backlight set 0 -q && t2_log "Backlight turned off (idle)"' \
     resume '/usr/bin/brightnessctl -d :white:kbd_backlight set 10% -q && t2_log "Backlight restored (activity)"'
