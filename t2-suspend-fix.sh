@@ -506,6 +506,13 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][stop-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
 t2_log "Stopping PipeWire audio session..."
+
+# Check if PipeWire is installed
+if ! systemctl --user list-unit-files pipewire.socket 2>/dev/null | grep -q pipewire; then
+    t2_log "SKIP: PipeWire not found (not installed)"
+    exit 0
+fi
+
 uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
 if [ -z "$uid" ]; then
     t2_log "SKIP: no user session found"
@@ -534,6 +541,13 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][start-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
 t2_log "Starting PipeWire audio session..."
+
+# Check if PipeWire is installed
+if ! systemctl --user list-unit-files pipewire.socket 2>/dev/null | grep -q pipewire; then
+    t2_log "SKIP: PipeWire not found (not installed)"
+    exit 0
+fi
+
 uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
 if [ -z "$uid" ]; then
     t2_log "SKIP: no user session found"
