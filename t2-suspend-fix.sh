@@ -59,7 +59,15 @@ if [ "$MODE" = "uninstall" ]; then
     fi
     echo -e "${YELLOW}⚙${NC} Uninstalling..."
 
-    # Stop and disable user service for all logged-in users
+    # System services: stop
+    echo "  - Stopping system services..."
+    sudo systemctl stop t2-suspend.service 2>/dev/null || true
+    sudo systemctl stop t2-resume.service 2>/dev/null || true
+    sudo systemctl stop fix-kbd-backlight.service 2>/dev/null || true
+    sudo systemctl stop fix-gmux-backlight.service 2>/dev/null || true
+    sudo systemctl stop fix-gmux-display.service 2>/dev/null || true
+
+    # User services: stop
     echo "  - Stopping user services..."
     for user in $(awk -F: '$3 >= 1000 && $3 < 60000 {print $1}' /etc/passwd); do
         uid=$(id -u "$user" 2>/dev/null) || continue
@@ -68,51 +76,69 @@ if [ "$MODE" = "uninstall" ]; then
         fi
     done
 
-    # Disable and remove (previous) fixes
-    echo "  - Disabling services..."
-    sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
-    sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
-    sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
+    # System services: disable (keep backward compatibility)
+    echo "  - Disabling system services..."
     sudo systemctl disable t2-suspend.service 2>/dev/null || true
     sudo systemctl disable t2-resume.service 2>/dev/null || true
     sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
+    # Legacy services for backward compatibility
+    sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
+    sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
+    sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
     sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
     sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
     sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
-    sudo systemctl disable --global kbd-backlight-auto.service 2>/dev/null || true
-    echo "  - Services disabled."
+    echo "  - System services disabled."
 
-    echo "  - Removing unit files and scripts..."
-    sudo rm -f /etc/systemd/system/suspend-fix-t2.service
-    sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
-    sudo rm -f /etc/systemd/system/resume-wifi-reload.service
+    # User services: disable
+    echo "  - Disabling user services..."
+    sudo systemctl disable --global kbd-backlight-auto.service 2>/dev/null || true
+    echo "  - User services disabled."
+
+    # System services: remove (keep backward compatibility)
+    echo "  - Removing system service files..."
     sudo rm -f /etc/systemd/system/t2-suspend.service
     sudo rm -f /etc/systemd/system/t2-resume.service
     sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-display.service
+    # Legacy service files for backward compatibility
+    sudo rm -f /etc/systemd/system/suspend-fix-t2.service
+    sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
+    sudo rm -f /etc/systemd/system/resume-wifi-reload.service
     sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
     sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
     sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
+    echo "  - System service files removed."
+
+    # User services: remove
+    echo "  - Removing user service files..."
+    sudo rm -f /etc/xdg/systemd/user/kbd-backlight-auto.service
+    echo "  - User service files removed."
+
+    # Scripts: remove (keep backward compatibility)
+    echo "  - Removing scripts..."
     sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
-    sudo rm -f /usr/local/bin/t2-wait-brcmfmac.sh
     sudo rm -f /usr/local/bin/t2-suspend.sh
     sudo rm -f /usr/local/bin/t2-resume.sh
     sudo rm -f /usr/local/bin/fix-kbd-backlight.sh
     sudo rm -f /usr/local/bin/fix-gmux-backlight.sh
     sudo rm -f /usr/local/bin/drm-display-off.sh
     sudo rm -f /usr/local/bin/drm-display-on.sh
-    sudo rm -f /usr/local/bin/enable-wakeup-devices.sh
     sudo rm -f /usr/local/bin/t2-stop-audio.sh
     sudo rm -f /usr/local/bin/t2-start-audio.sh
     sudo rm -f /usr/local/bin/kbd-backlight-auto.sh
+    # Legacy scripts for backward compatibility
+    sudo rm -f /usr/local/bin/t2-wait-brcmfmac.sh
+    sudo rm -f /usr/local/bin/enable-wakeup-devices.sh
     sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
     sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
-    sudo rm -f /etc/xdg/systemd/user/kbd-backlight-auto.service
-    echo "  - Unit files and scripts removed."
+    echo "  - Scripts removed."
 
+
+    # Reload systemd
     echo "  - Reloading systemd..."
     sudo systemctl daemon-reload
 
