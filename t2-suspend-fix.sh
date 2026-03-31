@@ -137,6 +137,10 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
     echo "  - Scripts removed."
 
+    # Library: remove
+    echo "  - Removing shared library..."
+    sudo rm -rf /usr/local/lib/t2-suspend-fix/
+    echo "  - Shared library removed."
 
     # Reload systemd
     echo "  - Reloading systemd..."
@@ -637,6 +641,13 @@ t2_log "OK: audio services started"
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-start-audio.sh
+echo -e "${GREEN}Done${NC}"
+
+# Create shared library directory and install library files
+echo -e "\n${YELLOW}⚙${NC} Creating shared library..."
+sudo mkdir -p /usr/local/lib/t2-suspend-fix
+sudo cp -r "$(dirname "$0")/lib/"* /usr/local/lib/t2-suspend-fix/
+sudo chmod -R 644 /usr/local/lib/t2-suspend-fix/
 echo -e "${GREEN}Done${NC}"
 
 # Create log file
