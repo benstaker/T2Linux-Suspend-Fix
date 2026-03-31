@@ -11,25 +11,26 @@ else
     exit 1
 fi
 
+# Fixed label for logging
+LABEL="drm-display"
+
 # Validate argument
 ACTION="$1"
 if [ -z "$ACTION" ]; then
-    t2_log "drm" "ERROR: No action specified (use 'on' or 'off')"
+    t2_log "$LABEL" "ERROR: No action specified (use 'on' or 'off')"
     exit 1
 fi
 
 if [ "$ACTION" != "on" ] && [ "$ACTION" != "off" ]; then
-    t2_log "drm" "ERROR: Invalid action '$ACTION' (use 'on' or 'off')"
+    t2_log "$LABEL" "ERROR: Invalid action '$ACTION' (use 'on' or 'off')"
     exit 1
 fi
 
-# Set label based on action
+# Set target and check status based on action
 if [ "$ACTION" = "on" ]; then
-    LABEL="drm-on"
     TARGET_STATUS="connected"
     CHECK_STATUS="disconnected"
 else
-    LABEL="drm-off"
     TARGET_STATUS="disconnected"
     CHECK_STATUS="connected"
 fi
