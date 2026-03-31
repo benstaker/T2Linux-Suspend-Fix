@@ -120,13 +120,17 @@ if [ "$MODE" = "uninstall" ]; then
 
     # Scripts: remove (keep backward compatibility)
     echo "  - Removing scripts..."
-    sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
-    sudo rm -f /usr/local/bin/t2-suspend.sh
-    sudo rm -f /usr/local/bin/t2-resume.sh
+    # Consolidated scripts
+    sudo rm -f /usr/local/bin/drm-display.sh
+    sudo rm -f /usr/local/bin/fix-backlight.sh
+    # Legacy scripts for backward compatibility
     sudo rm -f /usr/local/bin/fix-kbd-backlight.sh
     sudo rm -f /usr/local/bin/fix-gmux-backlight.sh
     sudo rm -f /usr/local/bin/drm-display-off.sh
     sudo rm -f /usr/local/bin/drm-display-on.sh
+    sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
+    sudo rm -f /usr/local/bin/t2-suspend.sh
+    sudo rm -f /usr/local/bin/t2-resume.sh
     sudo rm -f /usr/local/bin/t2-stop-audio.sh
     sudo rm -f /usr/local/bin/t2-start-audio.sh
     sudo rm -f /usr/local/bin/kbd-backlight-auto.sh
@@ -334,39 +338,12 @@ After=multi-user.target
 [Service]
 User=root
 Type=oneshot
-ExecStart=/usr/bin/bash /usr/local/bin/fix-kbd-backlight.sh
+ExecStart=/usr/local/bin/fix-backlight.sh :white:kbd_backlight 10%
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 EOF
-echo -e "${GREEN}Done${NC}"
-
-# Create 'fix-kbd-backlight.sh' script
-echo -e "\n${YELLOW}⚙${NC} Creating 'fix-kbd-backlight.sh' script..."
-sudo tee /usr/local/bin/fix-kbd-backlight.sh > /dev/null << 'EOF'
-#!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][kbd-bl] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
-# t2_log "Starting keyboard backlight fix..."
-
-for i in $(seq 1 10); do
-    SET_OUTPUT=$(brightnessctl -d :white:kbd_backlight set 10% 2>&1)
-    CURRENT=$(brightnessctl -d :white:kbd_backlight get 2>/dev/null)
-    case "$SET_OUTPUT" in
-        *"$CURRENT"*)
-            t2_log "OK: kbd backlight set to $CURRENT after $i/10 attempts"
-            exit 0
-            ;;
-    esac
-    sleep 0.5
-done
-
-t2_log "ERROR: could not set kbd backlight after 10 attempts"
-exit 0
-EOF
-sudo chmod +x /usr/local/bin/fix-kbd-backlight.sh
 echo -e "${GREEN}Done${NC}"
 
 # Create 'fix-gmux-display' service
@@ -379,9 +356,9 @@ After=graphical.target
 [Service]
 User=root
 Type=oneshot
-ExecStart=/usr/local/bin/drm-display-off.sh
-ExecStart=/usr/local/bin/drm-display-on.sh
-ExecStart=/usr/local/bin/fix-gmux-backlight.sh
+ExecStart=/usr/local/bin/drm-display.sh off
+ExecStart=/usr/local/bin/drm-display.sh on
+ExecStart=/usr/local/bin/fix-backlight.sh gmux_backlight 10%
 RemainAfterExit=yes
 
 [Install]
@@ -389,141 +366,13 @@ WantedBy=graphical.target
 EOF
 echo -e "${GREEN}Done${NC}"
 
-# Create 'fix-gmux-backlight.sh' script
-echo -e "\n${YELLOW}⚙${NC} Creating 'fix-gmux-backlight.sh' script..."
-sudo tee /usr/local/bin/fix-gmux-backlight.sh > /dev/null << 'EOF'
-#!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][gmux-bl] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
-# t2_log "Starting gmux backlight fix..."
-
-for i in $(seq 1 10); do
-    SET_OUTPUT=$(brightnessctl -d gmux_backlight set 10% 2>&1)
-    CURRENT=$(brightnessctl -d gmux_backlight get 2>/dev/null)
-    case "$SET_OUTPUT" in
-        *"$CURRENT"*)
-            t2_log "OK: gmux backlight set to $CURRENT after $i/10 attempts"
-            sleep 0.5
-            exit 0
-            ;;
-    esac
-    sleep 0.5
+# Create consolidated scripts
+echo -e "\n${YELLOW}⚙${NC} Creating consolidated scripts..."
+for script in "$(dirname "$0")/bin/"*.sh; do
+    [ -f "$script" ] || continue
+    sudo cp "$script" /usr/local/bin/
+    sudo chmod +x "/usr/local/bin/$(basename "$script")"
 done
-
-t2_log "ERROR: could not set gmux backlight after 10 attempts"
-exit 0
-EOF
-sudo chmod +x /usr/local/bin/fix-gmux-backlight.sh
-echo -e "${GREEN}Done${NC}"
-
-# Create 'drm-display-off.sh' script
-echo -e "\n${YELLOW}⚙${NC} Creating 'drm-display-off.sh' script..."
-sudo tee /usr/local/bin/drm-display-off.sh > /dev/null << 'EOF'
-#!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][drm-off] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
-# t2_log "Starting DRM display off..."
-
-turn_off_display() {
-    local conn="$1"
-    local path="/sys/class/drm/${conn}"
-    [ -f "$path/status" ] || return 0
-    if grep -q "connected" "$path/status" 2>/dev/null; then
-        # t2_log "Turning off $path"
-        for i in $(seq 1 10); do
-            echo off > "$path/status" 2>/dev/null
-            STATUS=$(cat "$path/status" 2>/dev/null)
-            if [ "$STATUS" = "disconnected" ]; then
-                t2_log "OK: $path off after $i/10 attempts"
-                return 0
-            fi
-            sleep 0.5
-        done
-        t2_log "ERROR: failed to turn off $path"
-    fi
-    return 0
-}
-
-INTEL_CONN="" AMD_CONN=""
-for card in /sys/class/drm/card[0-9]*; do
-    driver=$(cat "$card/device/uevent" 2>/dev/null | grep "^DRIVER=" | cut -d= -f2)
-    for conn in "$card"/*-eDP-*; do
-        if [ -f "$conn/status" ] && grep -q "connected" "$conn/status" 2>/dev/null; then
-            connname=$(basename "$conn")
-            if [ "$driver" = "i915" ]; then
-                INTEL_CONN="$connname"
-                t2_log "Found Intel eDP: $connname"
-            elif [ "$driver" = "amdgpu" ]; then
-                AMD_CONN="$connname"
-                t2_log "Found AMD eDP: $connname"
-            fi
-        fi
-    done
-done
-
-[ -n "$AMD_CONN" ] && turn_off_display "$AMD_CONN"
-[ -n "$INTEL_CONN" ] && turn_off_display "$INTEL_CONN"
-
-exit 0
-EOF
-sudo chmod +x /usr/local/bin/drm-display-off.sh
-echo -e "${GREEN}Done${NC}"
-
-# Create 'drm-display-on.sh' script
-echo -e "\n${YELLOW}⚙${NC} Creating 'drm-display-on.sh' script..."
-sudo tee /usr/local/bin/drm-display-on.sh > /dev/null << 'EOF'
-#!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][drm-on] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
-# t2_log "Starting DRM display on..."
-
-turn_on_display() {
-    local conn="$1"
-    local path="/sys/class/drm/${conn}"
-    [ -f "$path/status" ] || return 0
-    if grep -q "disconnected" "$path/status" 2>/dev/null; then
-        # t2_log "Turning on $path"
-        for i in $(seq 1 10); do
-            echo on > "$path/status" 2>/dev/null
-            STATUS=$(cat "$path/status" 2>/dev/null)
-            if [ "$STATUS" = "connected" ]; then
-                t2_log "OK: $path on after $i/10 attempts"
-                return 0
-            fi
-            sleep 0.5
-        done
-        t2_log "ERROR: failed to turn on $path"
-    fi
-    return 0
-}
-
-INTEL_CONN="" AMD_CONN=""
-for card in /sys/class/drm/card[0-9]*; do
-    driver=$(cat "$card/device/uevent" 2>/dev/null | grep "^DRIVER=" | cut -d= -f2)
-    for conn in "$card"/*-eDP-*; do
-        if [ -f "$conn/status" ] && grep -q "disconnected" "$conn/status" 2>/dev/null; then
-            connname=$(basename "$conn")
-            if [ "$driver" = "i915" ]; then
-                INTEL_CONN="$connname"
-                t2_log "Found Intel eDP: $connname"
-            elif [ "$driver" = "amdgpu" ]; then
-                AMD_CONN="$connname"
-                t2_log "Found AMD eDP: $connname"
-            fi
-        fi
-    done
-done
-
-# Turn on Intel (primary) first
-[ -n "$INTEL_CONN" ] && turn_on_display "$INTEL_CONN"
-[ -n "$AMD_CONN" ] && turn_on_display "$AMD_CONN"
-
-exit 0
-EOF
-sudo chmod +x /usr/local/bin/drm-display-on.sh
 echo -e "${GREEN}Done${NC}"
 
 # Create 't2-wait-apple-bce.sh' script
@@ -752,7 +601,7 @@ fi
 
 # Turn off internal display before unloading gmux
 if [ "$APPLE_GMUX_RELOAD" = true ]; then
-    /usr/local/bin/drm-display-off.sh
+    /usr/local/bin/drm-display.sh off
 fi
 
 # Unload Apple GMUX
@@ -854,7 +703,7 @@ fi
 /usr/local/bin/t2-wait-apple-bce.sh
 
 # Turn on keyboard backlight
-/usr/local/bin/fix-kbd-backlight.sh
+/usr/local/bin/fix-backlight.sh :white:kbd_backlight 10%
 
 # Restart audio
 /usr/local/bin/t2-start-audio.sh
@@ -865,9 +714,9 @@ start_service tiny-dfr
 
 # Fix DRM display
 if [ "$APPLE_GMUX_RELOAD" = true ]; then
-    /usr/local/bin/drm-display-off.sh
-    /usr/local/bin/drm-display-on.sh
-    /usr/local/bin/fix-gmux-backlight.sh
+    /usr/local/bin/drm-display.sh off
+    /usr/local/bin/drm-display.sh on
+    /usr/local/bin/fix-backlight.sh gmux_backlight 10%
 fi 
 
 t2_log "Resume complete"
