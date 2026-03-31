@@ -142,6 +142,11 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -rf /usr/local/lib/t2-suspend-fix/
     echo "  - Shared library removed."
 
+    # Configuration: remove
+    echo "  - Removing configuration..."
+    sudo rm -rf /etc/t2-suspend-fix/
+    echo "  - Configuration removed."
+
     # Reload systemd
     echo "  - Reloading systemd..."
     sudo systemctl daemon-reload
