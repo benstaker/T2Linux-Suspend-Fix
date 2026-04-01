@@ -327,6 +327,19 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
+# Copy shared library files
+echo -e "\n${YELLOW}⚙${NC} Installing shared library..."
+sudo mkdir -p /usr/local/lib/t2-suspend-fix
+sudo cp -r "$(dirname "$0")/lib/"* /usr/local/lib/t2-suspend-fix/
+sudo chmod -R 644 /usr/local/lib/t2-suspend-fix/
+echo -e "${GREEN}Done${NC}"
+
+# Create log file
+echo -e "\n${YELLOW}⚙${NC} Creating log file '/var/log/t2-suspend-fix.log'..."
+sudo touch /var/log/t2-suspend-fix.log
+sudo chmod 666 /var/log/t2-suspend-fix.log
+echo -e "${GREEN}Done${NC}"
+
 # Create 'fix-kbd-backlight' service
 echo -e "\n${YELLOW}⚙${NC} Creating 'fix-kbd-backlight' service..."
 sudo tee /etc/systemd/system/fix-kbd-backlight.service > /dev/null << 'EOF'
@@ -494,19 +507,6 @@ t2_log "OK: audio services started"
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-start-audio.sh
-echo -e "${GREEN}Done${NC}"
-
-# Create shared library directory and install library files
-echo -e "\n${YELLOW}⚙${NC} Creating shared library..."
-sudo mkdir -p /usr/local/lib/t2-suspend-fix
-sudo cp -r "$(dirname "$0")/lib/"* /usr/local/lib/t2-suspend-fix/
-sudo chmod -R 644 /usr/local/lib/t2-suspend-fix/
-echo -e "${GREEN}Done${NC}"
-
-# Create log file
-echo -e "\n${YELLOW}⚙${NC} Creating log file '/var/log/t2-suspend-fix.log'..."
-sudo touch /var/log/t2-suspend-fix.log
-sudo chmod 666 /var/log/t2-suspend-fix.log
 echo -e "${GREEN}Done${NC}"
 
 # Create 't2-suspend.sh' script
