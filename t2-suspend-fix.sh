@@ -61,11 +61,11 @@ if [ "$MODE" = "uninstall" ]; then
 
     # System services: stop
     echo "  - Stopping system services..."
-    sudo systemctl stop t2-suspend.service 2>/dev/null || true
-    sudo systemctl stop t2-resume.service 2>/dev/null || true
-    sudo systemctl stop fix-kbd-backlight.service 2>/dev/null || true
     sudo systemctl stop fix-gmux-backlight.service 2>/dev/null || true
     sudo systemctl stop fix-gmux-display.service 2>/dev/null || true
+    sudo systemctl stop fix-kbd-backlight.service 2>/dev/null || true
+    sudo systemctl stop t2-resume.service 2>/dev/null || true
+    sudo systemctl stop t2-suspend.service 2>/dev/null || true
 
     # User services: stop
     echo "  - Stopping user services..."
@@ -78,18 +78,18 @@ if [ "$MODE" = "uninstall" ]; then
 
     # System services: disable (keep backward compatibility)
     echo "  - Disabling system services..."
-    sudo systemctl disable t2-suspend.service 2>/dev/null || true
-    sudo systemctl disable t2-resume.service 2>/dev/null || true
-    sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
     sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
+    sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
+    sudo systemctl disable t2-resume.service 2>/dev/null || true
+    sudo systemctl disable t2-suspend.service 2>/dev/null || true
     # Legacy services for backward compatibility
+    sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
+    sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
+    sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
+    sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
     sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
     sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
-    sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
-    sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
-    sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
-    sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
     echo "  - System services disabled."
 
     # User services: disable
@@ -99,18 +99,18 @@ if [ "$MODE" = "uninstall" ]; then
 
     # System services: remove (keep backward compatibility)
     echo "  - Removing system service files..."
-    sudo rm -f /etc/systemd/system/t2-suspend.service
-    sudo rm -f /etc/systemd/system/t2-resume.service
-    sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
     sudo rm -f /etc/systemd/system/fix-gmux-display.service
+    sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
+    sudo rm -f /etc/systemd/system/t2-resume.service
+    sudo rm -f /etc/systemd/system/t2-suspend.service
     # Legacy service files for backward compatibility
+    sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
+    sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
+    sudo rm -f /etc/systemd/system/resume-wifi-reload.service
+    sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
     sudo rm -f /etc/systemd/system/suspend-fix-t2.service
     sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
-    sudo rm -f /etc/systemd/system/resume-wifi-reload.service
-    sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
-    sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
-    sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
     echo "  - System service files removed."
 
     # User services: remove
@@ -124,21 +124,20 @@ if [ "$MODE" = "uninstall" ]; then
     sudo rm -f /usr/local/bin/drm-display.sh
     sudo rm -f /usr/local/bin/fix-backlight.sh
     # Legacy scripts for backward compatibility
-    sudo rm -f /usr/local/bin/fix-kbd-backlight.sh
-    sudo rm -f /usr/local/bin/fix-gmux-backlight.sh
+    sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
+    sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
     sudo rm -f /usr/local/bin/drm-display-off.sh
     sudo rm -f /usr/local/bin/drm-display-on.sh
-    sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
-    sudo rm -f /usr/local/bin/t2-suspend.sh
-    sudo rm -f /usr/local/bin/t2-resume.sh
-    sudo rm -f /usr/local/bin/t2-stop-audio.sh
-    sudo rm -f /usr/local/bin/t2-start-audio.sh
-    sudo rm -f /usr/local/bin/kbd-backlight-auto.sh
-    # Legacy scripts for backward compatibility
-    sudo rm -f /usr/local/bin/t2-wait-brcmfmac.sh
     sudo rm -f /usr/local/bin/enable-wakeup-devices.sh
-    sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
-    sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
+    sudo rm -f /usr/local/bin/fix-gmux-backlight.sh
+    sudo rm -f /usr/local/bin/fix-kbd-backlight.sh
+    sudo rm -f /usr/local/bin/kbd-backlight-auto.sh
+    sudo rm -f /usr/local/bin/t2-resume.sh
+    sudo rm -f /usr/local/bin/t2-start-audio.sh
+    sudo rm -f /usr/local/bin/t2-stop-audio.sh
+    sudo rm -f /usr/local/bin/t2-suspend.sh
+    sudo rm -f /usr/local/bin/t2-wait-apple-bce.sh
+    sudo rm -f /usr/local/bin/t2-wait-brcmfmac.sh
     echo "  - Scripts removed."
 
     # Library: remove
