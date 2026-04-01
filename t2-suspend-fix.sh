@@ -120,9 +120,11 @@ if [ "$MODE" = "uninstall" ]; then
 
     # Scripts: remove (keep backward compatibility)
     echo "  - Removing scripts..."
-    # Consolidated scripts
-    sudo rm -f /usr/local/bin/drm-display.sh
-    sudo rm -f /usr/local/bin/fix-backlight.sh
+    # Remove scripts installed from bin/ folder
+    for script in "$(dirname "$0")/bin/"*.sh; do
+        [ -f "$script" ] || continue
+        sudo rm -f "/usr/local/bin/$(basename "$script")"
+    done
     # Legacy scripts for backward compatibility
     sudo rm -f /usr/lib/systemd/system-sleep/90-t2-hibernate-test-brcmfmac.sh
     sudo rm -f /usr/lib/systemd/system-sleep/t2-resync
@@ -334,11 +336,38 @@ sudo cp -r "$(dirname "$0")/lib/"* /usr/local/lib/t2-suspend-fix/
 sudo chmod -R 644 /usr/local/lib/t2-suspend-fix/
 echo -e "${GREEN}Done${NC}"
 
+# Copy bin scripts
+echo -e "\n${YELLOW}⚙${NC} Installing scripts..."
+for script in "$(dirname "$0")/bin/"*.sh; do
+    [ -f "$script" ] || continue
+    sudo cp "$script" /usr/local/bin/
+    sudo chmod +x "/usr/local/bin/$(basename "$script")"
+done
+echo -e "${GREEN}Done${NC}"
+
 # Create log file
 echo -e "\n${YELLOW}⚙${NC} Creating log file '/var/log/t2-suspend-fix.log'..."
 sudo touch /var/log/t2-suspend-fix.log
 sudo chmod 666 /var/log/t2-suspend-fix.log
 echo -e "${GREEN}Done${NC}"
+
+# Run hardware detection
+echo -e "\n${YELLOW}⚙${NC} Running hardware detection..."
+if [ -f "$(dirname "$0")/bin/t2-detect-hardware.sh" ]; then
+    sudo "$(dirname "$0")/bin/t2-detect-hardware.sh"
+else
+    echo -e "${YELLOW}Warning: Hardware detection script not found${NC}"
+fi
+
+# Source detected hardware configuration
+if [ -f /etc/t2-suspend-fix/hardware.conf ]; then
+    # shellcheck source=/dev/null
+    . /etc/t2-suspend-fix/hardware.conf
+    echo -e "${GREEN}Hardware config loaded: HAS_GMUX=${HAS_GMUX:-unknown}${NC}"
+else
+    echo -e "${YELLOW}Warning: Hardware config not found, using defaults${NC}"
+    HAS_GMUX="true"
+fi
 
 # Create 'fix-kbd-backlight' service
 echo -e "\n${YELLOW}⚙${NC} Creating 'fix-kbd-backlight' service..."
@@ -350,41 +379,12 @@ After=multi-user.target
 [Service]
 User=root
 Type=oneshot
-ExecStart=/usr/local/bin/fix-backlight.sh :white:kbd_backlight 10%
+ExecStart=/usr/local/bin/t2-fix-backlight.sh :white:kbd_backlight 10%
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 EOF
-echo -e "${GREEN}Done${NC}"
-
-# Create 'fix-gmux-display' service
-echo -e "\n${YELLOW}⚙${NC} Creating 'fix-gmux-display' service..."
-sudo tee /etc/systemd/system/fix-gmux-display.service > /dev/null << 'EOF'
-[Unit]
-Description=Fix Apple GMUX Display After Resume
-After=graphical.target
-
-[Service]
-User=root
-Type=oneshot
-ExecStart=/usr/local/bin/drm-display.sh off
-ExecStart=/usr/local/bin/drm-display.sh on
-ExecStart=/usr/local/bin/fix-backlight.sh gmux_backlight 10%
-RemainAfterExit=yes
-
-[Install]
-WantedBy=graphical.target
-EOF
-echo -e "${GREEN}Done${NC}"
-
-# Create consolidated scripts
-echo -e "\n${YELLOW}⚙${NC} Creating consolidated scripts..."
-for script in "$(dirname "$0")/bin/"*.sh; do
-    [ -f "$script" ] || continue
-    sudo cp "$script" /usr/local/bin/
-    sudo chmod +x "/usr/local/bin/$(basename "$script")"
-done
 echo -e "${GREEN}Done${NC}"
 
 # Create 't2-wait-apple-bce.sh' script
@@ -514,11 +514,18 @@ echo -e "\n${YELLOW}⚙${NC} Creating 't2-suspend.sh' script..."
 sudo tee /usr/local/bin/t2-suspend.sh > /dev/null << 'SUSPEND_EOF'
 #!/bin/sh
 
-APPLE_BCE_RELOAD=true # Unloads and reloads apple_bce module
-APPLE_GMUX_RELOAD=true # Unloads and reloads apple_gmux module
-SENSORS_RELOAD=true # Unloads and reloads sensor driver modules
-TOUCHBAR_RELOAD=true # Unloads and reloads touchbar driver modules
-WIFI_RELOAD=true # Unloads and reloads WiFi driver modules
+# Source common library and hardware config
+if [ -f /usr/local/lib/t2-suspend-fix/common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/common.sh
+    detect_hardware
+fi
+
+# Configuration flags (defaults if hardware.conf not found)
+APPLE_BCE_RELOAD=true
+APPLE_GMUX_RELOAD="${HAS_GMUX:-true}"
+SENSORS_RELOAD=true
+TOUCHBAR_RELOAD=true
+WIFI_RELOAD=true
 
 LOG_FILE="/var/log/t2-suspend-fix.log"
 
@@ -600,7 +607,7 @@ fi
 
 # Turn off internal display before unloading gmux
 if [ "$APPLE_GMUX_RELOAD" = true ]; then
-    /usr/local/bin/drm-display.sh off
+    /usr/local/bin/t2-drm-display.sh off
 fi
 
 # Unload Apple GMUX
@@ -624,11 +631,18 @@ echo -e "\n${YELLOW}⚙${NC} Creating 't2-resume.sh' script..."
 sudo tee /usr/local/bin/t2-resume.sh > /dev/null << 'RESUME_EOF'
 #!/bin/sh
 
-APPLE_BCE_RELOAD=true # Unloads and reloads apple_bce module
-APPLE_GMUX_RELOAD=true # Unloads and reloads apple_gmux module
-SENSORS_RELOAD=true # Unloads and reloads sensor driver modules
-TOUCHBAR_RELOAD=true # Unloads and reloads touchbar driver modules
-WIFI_RELOAD=true # Unloads and reloads WiFi driver modules
+# Source common library and hardware config
+if [ -f /usr/local/lib/t2-suspend-fix/common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/common.sh
+    detect_hardware
+fi
+
+# Configuration flags (defaults if hardware.conf not found)
+APPLE_BCE_RELOAD=true
+APPLE_GMUX_RELOAD="${HAS_GMUX:-true}"
+SENSORS_RELOAD=true
+TOUCHBAR_RELOAD=true
+WIFI_RELOAD=true
 
 LOG_FILE="/var/log/t2-suspend-fix.log"
 
@@ -702,7 +716,7 @@ fi
 /usr/local/bin/t2-wait-apple-bce.sh
 
 # Turn on keyboard backlight
-/usr/local/bin/fix-backlight.sh :white:kbd_backlight 10%
+/usr/local/bin/t2-fix-backlight.sh :white:kbd_backlight 10%
 
 # Restart audio
 /usr/local/bin/t2-start-audio.sh
@@ -713,9 +727,9 @@ start_service tiny-dfr
 
 # Fix DRM display
 if [ "$APPLE_GMUX_RELOAD" = true ]; then
-    /usr/local/bin/drm-display.sh off
-    /usr/local/bin/drm-display.sh on
-    /usr/local/bin/fix-backlight.sh gmux_backlight 10%
+    /usr/local/bin/t2-drm-display.sh off
+    /usr/local/bin/t2-drm-display.sh on
+    /usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
 fi 
 
 t2_log "Resume complete"
@@ -811,13 +825,43 @@ sudo systemctl enable --global kbd-backlight-auto.service
 
 echo -e "${GREEN}Done${NC}"
 
+# Create GMUX-dependent services only if GMUX is present
+if [ "$HAS_GMUX" = "true" ]; then
+    echo -e "\n${YELLOW}⚙${NC} Creating GMUX-dependent services..."
+    
+    # Create 'fix-gmux-display' service
+    sudo tee /etc/systemd/system/fix-gmux-display.service > /dev/null << 'EOF'
+[Unit]
+Description=Fix Apple GMUX Display After Resume
+After=graphical.target
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=/usr/local/bin/t2-drm-display.sh off
+ExecStart=/usr/local/bin/t2-drm-display.sh on
+ExecStart=/usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target
+EOF
+    echo "  - fix-gmux-display.service created"
+    echo -e "${GREEN}GMUX services created${NC}"
+else
+    echo -e "\n${YELLOW}⚙${NC} Skipping GMUX services (single-GPU system detected)"
+fi
+
 # Activate services
 echo -e "\n${YELLOW}⚙${NC} Activating services..."
 sudo systemctl daemon-reload
 sudo systemctl enable t2-suspend.service
 sudo systemctl enable t2-resume.service
 sudo systemctl enable fix-kbd-backlight.service 
-sudo systemctl enable fix-gmux-display.service
+# Only enable GMUX service if it was created
+if [ "$HAS_GMUX" = "true" ]; then
+    sudo systemctl enable fix-gmux-display.service
+fi
 echo -e "${GREEN}Done${NC}"
 
 # Kernel parameters info
