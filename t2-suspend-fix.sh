@@ -817,34 +817,8 @@ WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibern
 EOF
 echo -e "${GREEN}Done${NC}"
 
-# Create keyboard backlight auto-off components
+# Create keyboard backlight auto-off service
 echo -e "\n${YELLOW}⚙${NC} Creating keyboard backlight auto-off service..."
-
-echo "  - Creating keyboard backlight auto script..."
-sudo tee /usr/local/bin/kbd-backlight-auto.sh > /dev/null << 'EOF'
-#!/bin/bash
-
-LOG_FILE="/var/log/t2-suspend-fix.log"
-BACKLIGHT_DEVICE=":white:kbd_backlight"
-IDLE_LIMIT=10
-
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][kbd-auto] $*" >> "$LOG_FILE" 2>/dev/null || true
-}
-
-# Check if running under Wayland
-if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
-    t2_log "ERROR: No display session found"
-    exit 1
-fi
-
-# Use swayidle to monitor idle time and control backlight
-t2_log "Starting keyboard backlight auto-off service (idle limit: ${IDLE_LIMIT}s)"
-swayidle -w \
-    timeout ${IDLE_LIMIT} '/usr/bin/brightnessctl -d :white:kbd_backlight set 0 -q && t2_log "Backlight turned off (idle)"' \
-    resume '/usr/bin/brightnessctl -d :white:kbd_backlight set 10% -q && t2_log "Backlight restored (activity)"'
-EOF
-sudo chmod +x /usr/local/bin/kbd-backlight-auto.sh
 
 echo "  - Creating systemd user service..."
 sudo mkdir -p /etc/xdg/systemd/user
@@ -855,9 +829,9 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/kbd-backlight-auto.sh
-Restart=always
-RestartSec=5
+ExecStart=/usr/local/bin/t2-kbd-backlight-auto.sh
+Restart=on-failure
+RestartSec=10
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 
 [Install]
