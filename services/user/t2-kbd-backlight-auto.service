@@ -1,0 +1,13 @@
+[Unit]
+Description=Keyboard Backlight Auto-off Service
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/t2-kbd-backlight-auto.sh
+Restart=on-failure
+RestartSec=10
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target

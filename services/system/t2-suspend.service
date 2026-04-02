@@ -1,0 +1,12 @@
+[Unit]
+Description=Suspend script for T2 MacBook
+Before=sleep.target
+StopWhenUnneeded=yes
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=/usr/local/bin/t2-suspend.sh
+
+[Install]
+WantedBy=sleep.target

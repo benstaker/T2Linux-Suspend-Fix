@@ -1,0 +1,14 @@
+[Unit]
+Description=Fix Apple GMUX Display After Resume
+After=graphical.target
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=/usr/local/bin/t2-drm-display.sh off
+ExecStart=/usr/local/bin/t2-drm-display.sh on
+ExecStart=/usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

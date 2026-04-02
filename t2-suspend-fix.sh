@@ -59,66 +59,87 @@ if [ "$MODE" = "uninstall" ]; then
     fi
     echo -e "${YELLOW}⚙${NC} Uninstalling..."
 
-    # System services: stop
-    echo "  - Stopping system services..."
-    sudo systemctl stop fix-gmux-backlight.service 2>/dev/null || true
-    sudo systemctl stop fix-gmux-display.service 2>/dev/null || true
-    sudo systemctl stop fix-kbd-backlight.service 2>/dev/null || true
-    sudo systemctl stop t2-resume.service 2>/dev/null || true
-    sudo systemctl stop t2-suspend.service 2>/dev/null || true
+    # Remove system services
+    echo "  - Removing system services..."
+    for svc in "$(dirname "$0")/services/system/"*.service; do
+        [ -f "$svc" ] || continue
+        svc_name=$(basename "$svc")
+        sudo systemctl stop "$svc_name" 2>/dev/null || true
+        sudo systemctl disable "$svc_name" 2>/dev/null || true
+        sudo rm -f "/etc/systemd/system/$svc_name"
+    done
+    echo "  - System services removed."
 
-    # User services: stop
-    echo "  - Stopping user services..."
+    # Remove user services
+    echo "  - Removing user services..."
+    for svc in "$(dirname "$0")/services/user/"*.service; do
+        [ -f "$svc" ] || continue
+        svc_name=$(basename "$svc")
+        for user in $(awk -F: '$3 >= 1000 && $3 < 60000 {print $1}' /etc/passwd); do
+            uid=$(id -u "$user" 2>/dev/null) || continue
+            if [ -S "/run/user/$uid/bus" ]; then
+                sudo -u "$user" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+                    systemctl --user stop "$svc_name" 2>/dev/null || true
+            fi
+        done
+        sudo systemctl disable --global "$svc_name" 2>/dev/null || true
+        sudo rm -f "/etc/xdg/systemd/user/$svc_name"
+    done
+    echo "  - User services removed."
+
+    # Remove legacy system services
+    echo "  - Removing legacy system services..."
+    sudo systemctl stop fix-gmux-backlight.service 2>/dev/null || true
+    sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
+
+    sudo systemctl stop fix-gmux-display.service 2>/dev/null || true
+    sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/fix-gmux-display.service
+
+    sudo systemctl stop fix-kbd-backlight.service 2>/dev/null || true
+    sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
+
+    sudo systemctl stop enable-wakeup-devices.service 2>/dev/null || true
+    sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
+
+    sudo systemctl stop resume-amdgpu-bind.service 2>/dev/null || true
+    sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
+
+    sudo systemctl stop resume-wifi-reload.service 2>/dev/null || true
+    sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/resume-wifi-reload.service
+
+    sudo systemctl stop suspend-amdgpu-unbind.service 2>/dev/null || true
+    sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
+
+    sudo systemctl stop suspend-fix-t2.service 2>/dev/null || true
+    sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/suspend-fix-t2.service
+
+    sudo systemctl stop suspend-wifi-unload.service 2>/dev/null || true
+    sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
+    echo "  - Legacy system services removed."
+
+    # Remove legacy user services
+    echo "  - Removing legacy user services..."
     for user in $(awk -F: '$3 >= 1000 && $3 < 60000 {print $1}' /etc/passwd); do
         uid=$(id -u "$user" 2>/dev/null) || continue
         if [ -S "/run/user/$uid/bus" ]; then
-            sudo -u "$user" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop kbd-backlight-auto.service 2>/dev/null || true
+            sudo -u "$user" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+                systemctl --user stop kbd-backlight-auto.service 2>/dev/null || true
         fi
     done
-
-    # System services: disable (keep backward compatibility)
-    echo "  - Disabling system services..."
-    sudo systemctl disable fix-gmux-backlight.service 2>/dev/null || true
-    sudo systemctl disable fix-gmux-display.service 2>/dev/null || true
-    sudo systemctl disable fix-kbd-backlight.service 2>/dev/null || true
-    sudo systemctl disable t2-resume.service 2>/dev/null || true
-    sudo systemctl disable t2-suspend.service 2>/dev/null || true
-    # Legacy services for backward compatibility
-    sudo systemctl disable enable-wakeup-devices.service 2>/dev/null || true
-    sudo systemctl disable resume-amdgpu-bind.service 2>/dev/null || true
-    sudo systemctl disable resume-wifi-reload.service 2>/dev/null || true
-    sudo systemctl disable suspend-amdgpu-unbind.service 2>/dev/null || true
-    sudo systemctl disable suspend-fix-t2.service 2>/dev/null || true
-    sudo systemctl disable suspend-wifi-unload.service 2>/dev/null || true
-    echo "  - System services disabled."
-
-    # User services: disable
-    echo "  - Disabling user services..."
     sudo systemctl disable --global kbd-backlight-auto.service 2>/dev/null || true
-    echo "  - User services disabled."
-
-    # System services: remove (keep backward compatibility)
-    echo "  - Removing system service files..."
-    sudo rm -f /etc/systemd/system/fix-gmux-backlight.service
-    sudo rm -f /etc/systemd/system/fix-gmux-display.service
-    sudo rm -f /etc/systemd/system/fix-kbd-backlight.service
-    sudo rm -f /etc/systemd/system/t2-resume.service
-    sudo rm -f /etc/systemd/system/t2-suspend.service
-    # Legacy service files for backward compatibility
-    sudo rm -f /etc/systemd/system/enable-wakeup-devices.service
-    sudo rm -f /etc/systemd/system/resume-amdgpu-bind.service
-    sudo rm -f /etc/systemd/system/resume-wifi-reload.service
-    sudo rm -f /etc/systemd/system/suspend-amdgpu-unbind.service
-    sudo rm -f /etc/systemd/system/suspend-fix-t2.service
-    sudo rm -f /etc/systemd/system/suspend-wifi-unload.service
-    echo "  - System service files removed."
-
-    # User services: remove
-    echo "  - Removing user service files..."
     sudo rm -f /etc/xdg/systemd/user/kbd-backlight-auto.service
-    echo "  - User service files removed."
+    echo "  - Legacy user services removed."
 
-    # Scripts: remove (keep backward compatibility)
+    # Scripts: remove
     echo "  - Removing scripts..."
     # Remove scripts installed from bin/ folder
     for script in "$(dirname "$0")/bin/"*.sh; do
@@ -329,6 +350,12 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
+# Create log file
+echo -e "\n${YELLOW}⚙${NC} Creating log file '/var/log/t2-suspend-fix.log'..."
+sudo touch /var/log/t2-suspend-fix.log
+sudo chmod 666 /var/log/t2-suspend-fix.log
+echo -e "${GREEN}Done${NC}"
+
 # Copy shared library files
 echo -e "\n${YELLOW}⚙${NC} Installing shared library..."
 sudo mkdir -p /usr/local/lib/t2-suspend-fix
@@ -343,12 +370,6 @@ for script in "$(dirname "$0")/bin/"*.sh; do
     sudo cp "$script" /usr/local/bin/
     sudo chmod +x "/usr/local/bin/$(basename "$script")"
 done
-echo -e "${GREEN}Done${NC}"
-
-# Create log file
-echo -e "\n${YELLOW}⚙${NC} Creating log file '/var/log/t2-suspend-fix.log'..."
-sudo touch /var/log/t2-suspend-fix.log
-sudo chmod 666 /var/log/t2-suspend-fix.log
 echo -e "${GREEN}Done${NC}"
 
 # Run hardware detection
@@ -369,22 +390,34 @@ else
     HAS_GMUX="true"
 fi
 
-# Create 'fix-kbd-backlight' service
-echo -e "\n${YELLOW}⚙${NC} Creating 'fix-kbd-backlight' service..."
-sudo tee /etc/systemd/system/fix-kbd-backlight.service > /dev/null << 'EOF'
-[Unit]
-Description=Fix Apple BCE Keyboard Backlight
-After=multi-user.target
+# Install system service files
+echo -e "\n${YELLOW}⚙${NC} Installing system services..."
 
-[Service]
-User=root
-Type=oneshot
-ExecStart=/usr/local/bin/t2-fix-backlight.sh :white:kbd_backlight 10%
-RemainAfterExit=yes
+sudo cp "$(dirname "$0")/services/system/t2-fix-kbd-backlight.service" /etc/systemd/system/
+echo "  - t2-fix-kbd-backlight.service installed"
 
-[Install]
-WantedBy=multi-user.target
-EOF
+sudo cp "$(dirname "$0")/services/system/t2-suspend.service" /etc/systemd/system/
+echo "  - t2-suspend.service installed"
+
+sudo cp "$(dirname "$0")/services/system/t2-resume.service" /etc/systemd/system/
+echo "  - t2-resume.service installed"
+
+if [ "$HAS_GMUX" = "true" ]; then
+    sudo cp "$(dirname "$0")/services/system/t2-fix-gmux-display.service" /etc/systemd/system/
+    echo "  - t2-fix-gmux-display.service installed"
+else
+    echo "  - t2-fix-gmux-display.service skipped (no GMUX)"
+fi
+
+echo -e "${GREEN}Done${NC}"
+
+# User services
+echo -e "\n${YELLOW}⚙${NC} Installing user services..."
+
+sudo mkdir -p /etc/xdg/systemd/user
+sudo cp "$(dirname "$0")/services/user/t2-kbd-backlight-auto.service" /etc/xdg/systemd/user/
+echo "  - t2-kbd-backlight-auto.service installed (user)"
+
 echo -e "${GREEN}Done${NC}"
 
 # Create 't2-wait-apple-bce.sh' script
@@ -782,104 +815,21 @@ RESUME_EOF
 sudo chmod +x /usr/local/bin/t2-resume.sh
 echo -e "${GREEN}Done${NC}"
 
-# Create 't2-suspend' service
-echo -e "\n${YELLOW}⚙${NC} Creating 't2-suspend' service..."
-sudo tee /etc/systemd/system/t2-suspend.service > /dev/null << 'EOF'
-[Unit]
-Description=Suspend script for T2 MacBook
-Before=sleep.target
-StopWhenUnneeded=yes
-
-[Service]
-User=root
-Type=oneshot
-ExecStart=/usr/local/bin/t2-suspend.sh
-
-[Install]
-WantedBy=sleep.target
-EOF
-echo -e "${GREEN}Done${NC}"
-
-# Create 't2-resume' service
-echo -e "\n${YELLOW}⚙${NC} Creating 't2-resume' service..."
-sudo tee /etc/systemd/system/t2-resume.service > /dev/null << 'EOF'
-[Unit]
-Description=Resume script for T2 MacBook
-After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
-
-[Service]
-User=root
-Type=oneshot
-ExecStart=/usr/local/bin/t2-resume.sh
-
-[Install]
-WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
-EOF
-echo -e "${GREEN}Done${NC}"
-
-# Create keyboard backlight auto-off service
-echo -e "\n${YELLOW}⚙${NC} Creating keyboard backlight auto-off service..."
-
-echo "  - Creating systemd user service..."
-sudo mkdir -p /etc/xdg/systemd/user
-sudo tee /etc/xdg/systemd/user/kbd-backlight-auto.service > /dev/null << 'EOF'
-[Unit]
-Description=Keyboard Backlight Auto-off Service
-After=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/t2-kbd-backlight-auto.sh
-Restart=on-failure
-RestartSec=10
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-
-[Install]
-WantedBy=default.target
-EOF
-
-echo "  - Enabling service..."
-sudo systemctl enable --global kbd-backlight-auto.service
-
-echo -e "${GREEN}Done${NC}"
-
-# Create GMUX-dependent services only if GMUX is present
-if [ "$HAS_GMUX" = "true" ]; then
-    echo -e "\n${YELLOW}⚙${NC} Creating GMUX-dependent services..."
-    
-    # Create 'fix-gmux-display' service
-    sudo tee /etc/systemd/system/fix-gmux-display.service > /dev/null << 'EOF'
-[Unit]
-Description=Fix Apple GMUX Display After Resume
-After=graphical.target
-
-[Service]
-User=root
-Type=oneshot
-ExecStart=/usr/local/bin/t2-drm-display.sh off
-ExecStart=/usr/local/bin/t2-drm-display.sh on
-ExecStart=/usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
-RemainAfterExit=yes
-
-[Install]
-WantedBy=graphical.target
-EOF
-    echo "  - fix-gmux-display.service created"
-    echo -e "${GREEN}GMUX services created${NC}"
-else
-    echo -e "\n${YELLOW}⚙${NC} Skipping GMUX services (single-GPU system detected)"
-fi
-
-# Activate services
-echo -e "\n${YELLOW}⚙${NC} Activating services..."
+# Enable services
+echo -e "\n${YELLOW}⚙${NC} Enabling services..."
 sudo systemctl daemon-reload
+
+# Enable system services
 sudo systemctl enable t2-suspend.service
 sudo systemctl enable t2-resume.service
-sudo systemctl enable fix-kbd-backlight.service 
-# Only enable GMUX service if it was created
+sudo systemctl enable t2-fix-kbd-backlight.service 
 if [ "$HAS_GMUX" = "true" ]; then
-    sudo systemctl enable fix-gmux-display.service
+    sudo systemctl enable t2-fix-gmux-display.service
 fi
+
+# Enable user services
+sudo systemctl enable --global t2-kbd-backlight-auto.service
+
 echo -e "${GREEN}Done${NC}"
 
 # Kernel parameters info

@@ -1,0 +1,11 @@
+[Unit]
+Description=Resume script for T2 MacBook
+After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=/usr/local/bin/t2-resume.sh
+
+[Install]
+WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target

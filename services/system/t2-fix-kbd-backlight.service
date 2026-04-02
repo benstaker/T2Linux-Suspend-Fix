@@ -1,0 +1,12 @@
+[Unit]
+Description=Fix Apple BCE Keyboard Backlight
+After=multi-user.target
+
+[Service]
+User=root
+Type=oneshot
+ExecStart=/usr/local/bin/t2-fix-backlight.sh :white:kbd_backlight 10%
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
