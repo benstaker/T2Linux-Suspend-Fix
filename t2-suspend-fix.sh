@@ -360,7 +360,7 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Installing shared library..."
 sudo mkdir -p /usr/local/lib/t2-suspend-fix
 sudo cp -r "$(dirname "$0")/lib/"* /usr/local/lib/t2-suspend-fix/
-sudo chmod -R 644 /usr/local/lib/t2-suspend-fix/
+sudo chmod -R 755 /usr/local/lib/t2-suspend-fix/
 echo -e "${GREEN}Done${NC}"
 
 # Copy bin scripts
