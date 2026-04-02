@@ -131,29 +131,63 @@ detect_tiny_dfr() {
     echo "false"
 }
 
-# Get speaker device pattern based on hardware
-get_speaker_pattern() {
-    if [ "$HAS_SURROUND_AUDIO" = "true" ]; then
-        echo "input.filter-chain-speakers"
-    else
-        # Stereo pattern (may vary by model)
-        echo "input.filter-chain-speakers"
+# Detect if Apple BCE module is available
+detect_apple_bce() {
+    if lsmod 2>/dev/null | grep -q "^apple_bce" || [ -d "/sys/module/apple_bce" ]; then
+        echo "true"
+        return
     fi
+    # Check if module is available
+    if modinfo apple_bce >/dev/null 2>&1; then
+        echo "true"
+        return
+    fi
+    echo "false"
 }
 
-# Get mic device pattern based on hardware
-get_mic_pattern() {
-    echo "output.filter-chain-mic"
+# Detect if touchbar modules are available
+detect_touchbar() {
+    if lsmod 2>/dev/null | grep -q "^appletb" || [ -d "/sys/module/appletbdrm" ]; then
+        echo "true"
+        return
+    fi
+    # Check if modules are available
+    if modinfo appletbdrm >/dev/null 2>&1; then
+        echo "true"
+        return
+    fi
+    echo "false"
 }
 
-# Main detection
+# Detect if sensor modules are available
+detect_sensors() {
+    if lsmod 2>/dev/null | grep -q "^hid_sensor" || [ -d "/sys/module/industrialio" ]; then
+        echo "true"
+        return
+    fi
+    # Check if modules are available
+    if modinfo industrialio >/dev/null 2>&1; then
+        echo "true"
+        return
+    fi
+    echo "false"
+}
+
+# Detect if WiFi modules are available
+detect_wifi() {
+    if lsmod 2>/dev/null | grep -q "^brcm" || [ -d "/sys/module/brcmfmac" ]; then
+        echo "true"
+        return
+    fi
+    # Check if modules are available
+    if modinfo brcmfmac >/dev/null 2>&1; then
+        echo "true"
+        return
+    fi
+    echo "false"
+}
+
 t2_log "hw-detect" "Starting hardware detection..."
-
-# Detect features
-HAS_GMUX=$(detect_gmux)
-HAS_AMD_GPU=$(detect_amd_gpu)
-HAS_SURROUND_AUDIO=$(detect_surround_audio)
-HAS_TINYDFR=$(detect_tiny_dfr)
 
 # Create config directory
 mkdir -p "$(dirname "$T2_HARDWARE_CONF")"
@@ -162,25 +196,19 @@ mkdir -p "$(dirname "$T2_HARDWARE_CONF")"
 cat > "$T2_HARDWARE_CONF" << EOF
 # T2 Suspend Fix - Hardware Configuration
 # Generated: $(date -Iseconds)
-
-# Dual-GPU system with GMUX
-HAS_GMUX=$HAS_GMUX
-
-# AMD dedicated GPU present
-HAS_AMD_GPU=$HAS_AMD_GPU
-
-# Multi-channel (surround) speakers
-HAS_SURROUND_AUDIO=$HAS_SURROUND_AUDIO
-
-# Touchbar Display Function Row service present
-HAS_TINYDFR=$HAS_TINYDFR
-
-# Device patterns for audio detection
-SPEAKER_DEVICE_PATTERN="$(get_speaker_pattern)"
-MIC_DEVICE_PATTERN="$(get_mic_pattern)"
+HAS_GMUX=$(detect_gmux)
+HAS_AMD_GPU=$(detect_amd_gpu)
+HAS_SURROUND_AUDIO=$(detect_surround_audio)
+HAS_TINYDFR=$(detect_tiny_dfr)
+HAS_APPLE_BCE=$(detect_apple_bce)
+HAS_TOUCHBAR=$(detect_touchbar)
+HAS_SENSORS=$(detect_sensors)
+HAS_WIFI=$(detect_wifi)
+SPEAKER_DEVICE_PATTERN="input.filter-chain-speakers"
+MIC_DEVICE_PATTERN="output.filter-chain-mic"
 EOF
 
 t2_log "hw-detect" "Hardware configuration written to $T2_HARDWARE_CONF"
 echo "Configuration saved to: $T2_HARDWARE_CONF":
 echo ""
-cat $T2_HARDWARE_CONF
+cat "$T2_HARDWARE_CONF"
