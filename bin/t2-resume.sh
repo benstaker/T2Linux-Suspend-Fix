@@ -18,24 +18,11 @@ t2_log "$LABEL" "Starting resume..."
 # Load Apple BCE
 if [ "$HAS_APPLE_BCE" = true ]; then
     load_mod apple_bce
-
-    # Debug: Monitor all module loading for 8s after apple_bce
-    # t2_log "$LABEL" "DEBUG: Monitoring module loading after apple_bce..."
-    # for i in 1 2 3 4 5 6 7 8; do
-    #     mods=$(lsmod | awk 'NR>1 {print $1}' | tr '\n' ' ')
-    #     t2_log "$LABEL" "DEBUG: t=${i}s modules: $mods"
-    #     sleep 1
-    # done
-
-    # Wait for sensors auto-loaded by apple_bce
     /usr/local/bin/t2-wait-lsmod.sh industrialio 10
 fi
 
 # Start t2fanrd service
 start_service t2fanrd
-
-# Turn off DRM displays
-/usr/local/bin/t2-drm-display.sh off
 
 # Load WiFi
 if [ "$HAS_WIFI" = true ]; then
@@ -56,7 +43,8 @@ if [ "$HAS_GMUX" = true ]; then
     load_mod apple_gmux
 fi
 
-# Turn on DRM displays
+# Toggle DRM displays
+/usr/local/bin/t2-drm-display.sh off
 /usr/local/bin/t2-drm-display.sh on
 
 # Correct GMUX backlight
