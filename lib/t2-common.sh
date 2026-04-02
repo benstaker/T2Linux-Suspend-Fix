@@ -106,14 +106,19 @@ unload_mod() {
 start_service() {
     local svc="$1"
     local label="${2:-resume}"
-    
+
     if ! check_service_exists "$svc"; then
         t2_log "$label" "SKIP: $svc not installed"
         return 0
     fi
-    
+
+    if systemctl is-active "$svc" >/dev/null 2>&1; then
+        t2_log "$label" "SKIP: $svc already active"
+        return 0
+    fi
+
     systemctl start "$svc" --no-block 2>/dev/null || true
-    
+
     for i in $(seq 1 20); do
         if systemctl is-active "$svc" >/dev/null 2>&1; then
             t2_log "$label" "OK: $svc started after $i/20 attempts"
@@ -121,7 +126,7 @@ start_service() {
         fi
         sleep 0.5
     done
-    
+
     t2_log "$label" "ERROR: $svc start timed out after 10s"
     return 1
 }
@@ -131,14 +136,19 @@ start_service() {
 stop_service() {
     local svc="$1"
     local label="${2:-suspend}"
-    
+
     if ! check_service_exists "$svc"; then
         t2_log "$label" "SKIP: $svc not installed"
         return 0
     fi
-    
+
+    if ! systemctl is-active "$svc" >/dev/null 2>&1; then
+        t2_log "$label" "SKIP: $svc already inactive"
+        return 0
+    fi
+
     systemctl stop "$svc" --no-block 2>/dev/null || true
-    
+
     for i in $(seq 1 20); do
         if ! systemctl is-active "$svc" >/dev/null 2>&1; then
             t2_log "$label" "OK: $svc stopped after $i/20 attempts"
@@ -146,7 +156,7 @@ stop_service() {
         fi
         sleep 0.5
     done
-    
+
     t2_log "$label" "ERROR: $svc stop timed out after 10s"
     return 1
 }
