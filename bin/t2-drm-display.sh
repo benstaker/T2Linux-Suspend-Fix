@@ -44,8 +44,11 @@ control_display() {
     
     [ -f "$path/status" ] || return 0
     
-    if ! grep -q "$CHECK_STATUS" "$path/status" 2>/dev/null; then
+    local current_status
+    current_status=$(cat "$path/status" 2>/dev/null)
+    if [ "$current_status" != "$CHECK_STATUS" ]; then
         # Already in target state or doesn't exist
+        t2_log "$LABEL" "SKIP: $conn already $ACTION"
         return 0
     fi
     
