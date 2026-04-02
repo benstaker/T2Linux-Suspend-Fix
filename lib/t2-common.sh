@@ -165,34 +165,6 @@ load_hardware_config() {
     exit 1
 }
 
-# Get DRM connector names for Intel and AMD GPUs
-# Usage: get_drm_connectors
-# Sets: INTEL_CONN, AMD_CONN (global variables)
-get_drm_connectors() {
-    INTEL_CONN=""
-    AMD_CONN=""
-    
-    for card in /sys/class/drm/card[0-9]*; do
-        [ -d "$card" ] || continue
-        
-        local driver
-        driver=$(cat "$card/device/uevent" 2>/dev/null | grep "^DRIVER=" | cut -d= -f2)
-        
-        for conn in "$card"/*-eDP-*; do
-            [ -f "$conn/status" ] || continue
-            
-            local connname
-            connname=$(basename "$conn")
-            
-            if [ "$driver" = "i915" ]; then
-                INTEL_CONN="$connname"
-            elif [ "$driver" = "amdgpu" ]; then
-                AMD_CONN="$connname"
-            fi
-        done
-    done
-}
-
 # Set backlight brightness with retry
 # Usage: set_backlight <device> <value>
 # Device examples: ":white:kbd_backlight", "gmux_backlight"

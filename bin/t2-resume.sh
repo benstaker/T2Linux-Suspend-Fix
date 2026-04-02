@@ -34,12 +34,19 @@ fi
 # Start t2fanrd service
 start_service t2fanrd
 
+# Turn off DRM displays
+/usr/local/bin/t2-drm-display.sh off
+
 # Load WiFi
 if [ "$HAS_WIFI" = true ]; then
     load_mod brcmutil
     load_mod brcmfmac
     load_mod brcmfmac_wcc
 fi
+
+# Restart audio
+/usr/local/bin/t2-start-audio.sh
+/usr/local/bin/t2-set-default-audio.sh
 
 # Turn on keyboard backlight
 /usr/local/bin/t2-fix-backlight.sh :white:kbd_backlight 10%
@@ -49,22 +56,12 @@ if [ "$HAS_GMUX" = true ]; then
     load_mod apple_gmux
 fi
 
-# Turn on DRM display
+# Turn on DRM displays
 /usr/local/bin/t2-drm-display.sh on
 
 # Correct GMUX backlight
 if [ "$HAS_GMUX" = true ]; then
     /usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
-fi
-
-# Restart audio
-/usr/local/bin/t2-start-audio.sh
-/usr/local/bin/t2-set-default-audio.sh
-
-# Reload Touchbar keyboard
-if [ "$HAS_TOUCHBAR" = true ]; then
-    unload_mod hid_appletb_kbd
-    load_mod hid_appletb_kbd
 fi
 
 # Start tiny-dfr service
