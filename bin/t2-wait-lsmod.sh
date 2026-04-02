@@ -22,6 +22,8 @@ fi
 # Calculate iterations (0.5s sleep per iteration)
 ITERATIONS=$((TIMEOUT * 2))
 
+t2_log "$LABEL" "Waiting for $MODULE to appear (timeout: ${TIMEOUT}s)..."
+
 for i in $(seq 1 "$ITERATIONS"); do
     if lsmod | grep -q "^${MODULE}"; then
         t2_log "$LABEL" "OK: $MODULE found in lsmod (attempt $i/$ITERATIONS)"
