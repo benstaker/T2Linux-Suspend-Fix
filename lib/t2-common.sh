@@ -151,21 +151,18 @@ stop_service() {
     return 1
 }
 
-# Detect and source hardware configuration
+# Load hardware configuration
+# Sources the hardware config file - exits with error if not found
 # Sets: HAS_GMUX, HAS_AMD_GPU, HAS_SURROUND_AUDIO, HAS_TINYDFR, etc.
-detect_hardware() {
+load_hardware_config() {
     if [ -f "$T2_HARDWARE_CONF" ]; then
         # shellcheck source=/dev/null
         . "$T2_HARDWARE_CONF"
         return 0
     fi
     
-    # Set defaults if config doesn't exist
-    HAS_GMUX=""
-    HAS_AMD_GPU=""
-    HAS_SURROUND_AUDIO=""
-    HAS_TINYDFR=""
-    return 1
+    echo "Error: Hardware config not found at $T2_HARDWARE_CONF" >&2
+    exit 1
 }
 
 # Get DRM connector names for Intel and AMD GPUs

@@ -363,6 +363,14 @@ sudo cp -r "$(dirname "$0")/lib/"* /usr/local/lib/t2-suspend-fix/
 sudo chmod -R 755 /usr/local/lib/t2-suspend-fix/
 echo -e "${GREEN}Done${NC}"
 
+# Source common library
+if [ -f /usr/local/lib/t2-suspend-fix/t2-common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/t2-common.sh
+else
+    echo -e "${RED}Error: t2-common.sh not found${NC}"
+    exit 1
+fi
+
 # Copy bin scripts
 echo -e "\n${YELLOW}⚙${NC} Installing scripts..."
 for script in "$(dirname "$0")/bin/"*.sh; do
@@ -380,15 +388,9 @@ else
     echo -e "${YELLOW}Warning: Hardware detection script not found${NC}"
 fi
 
-# Source detected hardware configuration
-if [ -f /etc/t2-suspend-fix/hardware.conf ]; then
-    # shellcheck source=/dev/null
-    . /etc/t2-suspend-fix/hardware.conf
-    echo -e "${GREEN}Hardware config loaded: HAS_GMUX=${HAS_GMUX:-unknown}${NC}"
-else
-    echo -e "${YELLOW}Warning: Hardware config not found, using defaults${NC}"
-    HAS_GMUX="true"
-fi
+# Load hardware configuration
+load_hardware_config
+echo -e "${GREEN}Hardware config loaded: HAS_GMUX=${HAS_GMUX:-unknown}${NC}"
 
 # Install system service files
 echo -e "\n${YELLOW}⚙${NC} Installing system services..."

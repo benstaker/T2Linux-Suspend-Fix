@@ -5,10 +5,10 @@
 # Value: brightness value (default: 10%)
 
 # Source common library
-if [ -f /usr/local/lib/t2-suspend-fix/common.sh ]; then
-    . /usr/local/lib/t2-suspend-fix/common.sh
+if [ -f /usr/local/lib/t2-suspend-fix/t2-common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/t2-common.sh
 else
-    echo "Error: common.sh not found" >&2
+    echo "Error: t2-common.sh not found" >&2
     exit 1
 fi
 
