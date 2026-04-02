@@ -61,8 +61,11 @@ fi
 /usr/local/bin/t2-start-audio.sh
 /usr/local/bin/t2-set-default-audio.sh
 
-# Wait for touchbar auto-loaded by apple_bce
-/usr/local/bin/t2-wait-lsmod.sh appletbdrm 10
+# Reload Touchbar keyboard
+if [ "$HAS_TOUCHBAR" = true ]; then
+    unload_mod hid_appletb_kbd
+    load_mod hid_appletb_kbd
+fi
 
 # Start tiny-dfr service
 start_service tiny-dfr
