@@ -49,11 +49,10 @@ if [ "$HAS_SENSORS" = true ]; then
     unload_mod industrialio
 fi
 
-# Turn off DRM displays
-/usr/local/bin/t2-drm-display.sh off
-
-# Unload Apple GMUX
 if [ "$HAS_GMUX" = true ]; then
+    # Turn off DRM displays
+    /usr/local/bin/t2-drm-display.sh off
+    # Unload Apple GMUX
     unload_mod apple_gmux
 fi
 

@@ -38,17 +38,13 @@ fi
 # Turn on keyboard backlight
 /usr/local/bin/t2-fix-backlight.sh :white:kbd_backlight 10%
 
-# Load Apple GMUX
 if [ "$HAS_GMUX" = true ]; then
+    # Load Apple GMUX
     load_mod apple_gmux
-fi
-
-# Toggle DRM displays
-/usr/local/bin/t2-drm-display.sh off
-/usr/local/bin/t2-drm-display.sh on
-
-# Correct GMUX backlight
-if [ "$HAS_GMUX" = true ]; then
+    # Toggle DRM displays
+    /usr/local/bin/t2-drm-display.sh off
+    /usr/local/bin/t2-drm-display.sh on
+    # Correct GMUX backlight
     /usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
 fi
 

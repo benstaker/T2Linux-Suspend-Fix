@@ -1,7 +1,6 @@
 #!/bin/sh
 # T2 Suspend Fix - DRM Display Control
 # Usage: drm-display.sh <on|off>
-# Controls display power state for Intel, AMD, and Touchbar DRM connectors
 
 # Source common library
 if [ -f /usr/local/lib/t2-suspend-fix/t2-common.sh ]; then
@@ -70,10 +69,9 @@ control_display() {
 }
 
 # Scan DRM connectors and control them based on driver type
-# Order: AMD (first off, second on), Intel (second off, first on), Touchbar (last)
 INTEL_CONN=""
 AMD_CONN=""
-TOUCHBAR_CONN=""
+# TOUCHBAR_CONN=""
 
 for card in /sys/class/drm/card[0-9]*; do
     [ -d "$card" ] || continue
@@ -99,29 +97,27 @@ for card in /sys/class/drm/card[0-9]*; do
                 break
             done
             ;;
-        "appletbdrm")
-            # Touchbar DRM - find USB connector
-            for conn in "$card"/*-USB-*; do
-                [ -f "$conn/status" ] || continue
-                TOUCHBAR_CONN=$(basename "$conn")
-                t2_log "$LABEL" "Found Touchbar DRM: $TOUCHBAR_CONN"
-                break
-            done
-            ;;
+        # "appletbdrm")
+        #     # Touchbar DRM - find USB connector
+        #     for conn in "$card"/*-USB-*; do
+        #         [ -f "$conn/status" ] || continue
+        #         TOUCHBAR_CONN=$(basename "$conn")
+        #         t2_log "$LABEL" "Found Touchbar DRM: $TOUCHBAR_CONN"
+        #         break
+        #     done
+        #     ;;
     esac
 done
 
 # Control displays in order:
-# - Turn off: AMD first, then Intel, then Touchbar
-# - Turn on: Intel first, then AMD, then Touchbar
 if [ "$ACTION" = "off" ]; then
     [ -n "$AMD_CONN" ] && control_display "$AMD_CONN"
     [ -n "$INTEL_CONN" ] && control_display "$INTEL_CONN"
-    [ -n "$TOUCHBAR_CONN" ] && control_display "$TOUCHBAR_CONN"
+    # [ -n "$TOUCHBAR_CONN" ] && control_display "$TOUCHBAR_CONN"
 else
+    # [ -n "$TOUCHBAR_CONN" ] && control_display "$TOUCHBAR_CONN"
     [ -n "$INTEL_CONN" ] && control_display "$INTEL_CONN"
     [ -n "$AMD_CONN" ] && control_display "$AMD_CONN"
-    [ -n "$TOUCHBAR_CONN" ] && control_display "$TOUCHBAR_CONN"
 fi
 
 exit 0
