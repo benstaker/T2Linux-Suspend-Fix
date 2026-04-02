@@ -212,7 +212,7 @@ set_backlight() {
         
         case "$set_output" in
             *"$current"*)
-                t2_log "$label" "OK: $device set to $current after $i/10 attempts"
+                t2_log "$label" "OK: $device set to $value after $i/10 attempts"
                 return 0
                 ;;
         esac
