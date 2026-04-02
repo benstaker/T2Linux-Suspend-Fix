@@ -18,27 +18,13 @@ t2_log "$LABEL" "Starting resume..."
 # Load Apple BCE
 if [ "$HAS_APPLE_BCE" = true ]; then
     load_mod apple_bce
+    # Wait for module auto-loaded by apple_bce
+    /usr/local/bin/t2-wait-lsmod.sh industrialio 20
 fi
 
 # Load Apple GMUX
 if [ "$HAS_GMUX" = true ]; then
     load_mod apple_gmux
-fi
-
-# Load Sensors
-if [ "$HAS_SENSORS" = true ]; then
-    load_mod industrialio
-    load_mod industrialio_triggered_buffer
-    load_mod hid_sensor_iio_common
-    load_mod hid_sensor_rotation
-    load_mod hid_sensor_als
-fi
-
-# Load Touchbar
-if [ "$HAS_TOUCHBAR" = true ]; then
-    load_mod appletbdrm
-    load_mod hid_appletb_kbd
-    load_mod hid_appletb_bl
 fi
 
 # Load WiFi
@@ -48,9 +34,12 @@ if [ "$HAS_WIFI" = true ]; then
     load_mod brcmfmac_wcc
 fi
 
-# Wait for touchbar modules
-if [ "$HAS_TOUCHBAR" = true ]; then
-    /usr/local/bin/t2-wait-lsmod.sh appletbdrm 10
+# Turn on DRM display
+/usr/local/bin/t2-drm-display.sh on
+
+# Correct GMUX backlight
+if [ "$HAS_GMUX" = true ]; then
+    /usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
 fi
 
 # Turn on keyboard backlight
@@ -63,12 +52,5 @@ fi
 # Start user services
 start_service t2fanrd
 start_service tiny-dfr
-
-# Fix DRM display
-if [ "$HAS_GMUX" = true ]; then
-    /usr/local/bin/t2-drm-display.sh off
-    /usr/local/bin/t2-drm-display.sh on
-    /usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
-fi 
 
 t2_log "$LABEL" "Resume complete"
