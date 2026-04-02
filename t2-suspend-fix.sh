@@ -19,7 +19,7 @@ t2_log() {
     echo "[${timestamp}][${label}] ${msg}" | tee -a "$LOG_FILE" 2>/dev/null || true
 }
 
-echo -e "${GREEN}=== T2 MacBook Suspend Fix Installer v${VERSION} ===${NC}\n"
+echo -e "${GREEN}=== T2 MacBook Suspend Fix Installer ===${NC}\n"
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then 
