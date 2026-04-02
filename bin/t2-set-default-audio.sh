@@ -20,13 +20,14 @@ t2_log "set-default-audio" "Looking for audio devices (polling for 5s)..."
 # Poll for up to 5s for devices to appear
 for i in $(seq 1 10); do
     # Try different speaker patterns (16" uses filter-chain, 13" uses Apple Audio Device)
+    # Extract the numeric ID (second field), removing trailing dot
     T2_SPEAKERS=$(XDG_RUNTIME_DIR="/run/user/$uid" \
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-        wpctl status 2>/dev/null | grep -iE 'input\.filter-chain-speakers|Apple Audio Device Speakers' | awk '{print $3}' | tr -d '.' | head -n1)
+        wpctl status 2>/dev/null | grep -iE 'input\.filter-chain-speakers|Apple Audio Device Speakers' | awk '{print $2}' | tr -d '.')
     # Try different mic patterns (prefer builtin mic)
     T2_MIC=$(XDG_RUNTIME_DIR="/run/user/$uid" \
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-        wpctl status 2>/dev/null | grep -iE 'output\.filter-chain-mic|Apple Audio Device.*BuiltinMic' | awk '{print $3}' | tr -d '.' | head -n1)
+        wpctl status 2>/dev/null | grep -iE 'output\.filter-chain-mic|Apple Audio Device.*BuiltinMic' | awk '{print $2}' | tr -d '.')
     if [ -n "$T2_SPEAKERS" ] || [ -n "$T2_MIC" ]; then
         break
     fi
