@@ -204,8 +204,6 @@ HAS_APPLE_BCE=$(detect_apple_bce)
 HAS_TOUCHBAR=$(detect_touchbar)
 HAS_SENSORS=$(detect_sensors)
 HAS_WIFI=$(detect_wifi)
-SPEAKER_DEVICE_PATTERN="input.filter-chain-speakers"
-MIC_DEVICE_PATTERN="output.filter-chain-mic"
 EOF
 
 t2_log "hw-detect" "Hardware configuration written to $T2_HARDWARE_CONF"
