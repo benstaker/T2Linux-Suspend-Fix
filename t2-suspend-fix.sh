@@ -395,14 +395,14 @@ t2_log() {
     echo "[$(date +%Y_%m_%d-%H:%M:%S)][wait-bce] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
 }
 # t2_log "Starting wait for appletbdrm in lsmod..."
-for i in $(seq 1 30); do
+for i in $(seq 1 20); do
     if lsmod | grep -q "^appletbdrm"; then
-        t2_log "OK: appletbdrm found in lsmod (attempt $i/15)"
+        t2_log "OK: appletbdrm found in lsmod (attempt $i/20)"
         exit 0
     fi
     sleep 0.5
 done
-t2_log "ERROR: appletbdrm not found in lsmod after 15 attempts"
+t2_log "ERROR: appletbdrm not found in lsmod after 10s"
 exit 1
 EOF
 sudo chmod +x /usr/local/bin/t2-wait-apple-bce.sh
