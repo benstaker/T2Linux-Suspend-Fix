@@ -412,32 +412,41 @@ echo -e "${GREEN}Done${NC}"
 echo -e "\n${YELLOW}⚙${NC} Creating 't2-stop-audio.sh' script..."
 sudo tee /usr/local/bin/t2-stop-audio.sh > /dev/null << 'AUDIOEOF'
 #!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][stop-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
+# T2 Suspend Fix - Stop Audio
+
+# Source common library
+if [ -f /usr/local/lib/t2-suspend-fix/common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/common.sh
+else
+    exit 1
+fi
 
 # Check if PipeWire is installed (check for binary, since we run as root from system service)
 if ! command -v pipewire >/dev/null 2>&1; then
-    t2_log "SKIP: PipeWire not found (not installed)"
+    t2_log "stop-audio" "SKIP: PipeWire not found (not installed)"
     exit 0
 fi
 
 uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
 if [ -z "$uid" ]; then
-    t2_log "SKIP: no user session found"
+    t2_log "stop-audio" "SKIP: no user session found"
     exit 0
 fi
+
 if [ ! -S "/run/user/$uid/bus" ]; then
-    t2_log "SKIP: no D-Bus session found for uid $uid"
+    t2_log "stop-audio" "SKIP: no D-Bus session found for uid $uid"
     exit 0
 fi
+
 username=$(id -nu "$uid" 2>/dev/null) || exit 0
-t2_log "Stopping PipeWire for user $username (uid=$uid)..."
+t2_log "stop-audio" "Stopping PipeWire for user $username (uid=$uid)..."
+
 XDG_RUNTIME_DIR="/run/user/$uid" \
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     runuser -u "$username" -- \
     systemctl --user stop pipewire.socket pipewire-pulse.socket \
         pipewire.service pipewire-pulse.service wireplumber.service 2>/dev/null
+
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-stop-audio.sh
@@ -446,67 +455,101 @@ sudo chmod +x /usr/local/bin/t2-stop-audio.sh
 echo -e "\n${YELLOW}⚙${NC} Creating 't2-start-audio.sh' script..."
 sudo tee /usr/local/bin/t2-start-audio.sh > /dev/null << 'AUDIOEOF'
 #!/bin/sh
-t2_log() {
-    echo "[$(date +%Y_%m_%d-%H:%M:%S)][start-audio] $*" >> /var/log/t2-suspend-fix.log 2>/dev/null || true
-}
-# t2_log "Starting PipeWire audio session..."
+# T2 Suspend Fix - Start Audio
+# Starts PipeWire sockets after resume
 
-# Check if PipeWire is installed (check for binary, since we run as root from system service)
+# Source common library
+if [ -f /usr/local/lib/t2-suspend-fix/common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/common.sh
+else
+    exit 1
+fi
+
 if ! command -v pipewire >/dev/null 2>&1; then
-    t2_log "SKIP: PipeWire not found (not installed)"
+    t2_log "start-audio" "SKIP: PipeWire not found (not installed)"
     exit 0
 fi
 
 uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
 if [ -z "$uid" ]; then
-    t2_log "SKIP: no user session found"
+    t2_log "start-audio" "SKIP: no user session found"
     exit 0
 fi
+
 if [ ! -S "/run/user/$uid/bus" ]; then
-    t2_log "SKIP: no D-Bus session found for uid $uid"
+    t2_log "start-audio" "SKIP: no D-Bus session found for uid $uid"
     exit 0
 fi
+
 username=$(id -nu "$uid" 2>/dev/null) || exit 0
-t2_log "Starting PipeWire for user $username (uid=$uid)..."
+t2_log "start-audio" "Starting PipeWire for user $username (uid=$uid)..."
+
 XDG_RUNTIME_DIR="/run/user/$uid" \
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     runuser -u "$username" -- \
     systemctl --user start pipewire.socket pipewire-pulse.socket 2>/dev/null
-t2_log "OK: PipeWire sockets started"
 
-# Restore T2 DSP default devices if wpctl is available
-if command -v wpctl >/dev/null 2>&1; then
-    t2_log "Checking for T2 DSP devices (polling for 5s)..."
-    # Poll for up to 5s for DSP devices to appear
-    for i in $(seq 1 10); do
-        T2_SPEAKERS=$(XDG_RUNTIME_DIR="/run/user/$uid" \
-            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-            wpctl status 2>/dev/null | grep -F '[Audio/Sink]' | grep -F 'input.filter-chain-speakers' | sed -n 's/.* \([0-9]\+\)\..*/\1/p')
-        T2_MIC=$(XDG_RUNTIME_DIR="/run/user/$uid" \
-            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-            wpctl status 2>/dev/null | grep -F '[Audio/Source]' | grep -F 'output.filter-chain-mic' | sed -n 's/.* \([0-9]\+\)\..*/\1/p')
-        if [ -n "$T2_SPEAKERS" ] || [ -n "$T2_MIC" ]; then
-            break
-        fi
-        sleep 0.5
-    done
-    if [ -n "$T2_SPEAKERS" ]; then
-        XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" wpctl set-default "$T2_SPEAKERS" 2>/dev/null
-        t2_log "OK: T2 speakers set to $T2_SPEAKERS"
-    else
-        t2_log "NOTE: T2 speakers not found after 5s"
-    fi
-    if [ -n "$T2_MIC" ]; then
-        XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" wpctl set-default "$T2_MIC" -s 2>/dev/null
-        t2_log "OK: T2 mic set to $T2_MIC"
-    else
-        t2_log "NOTE: T2 mic not found after 5s"
-    fi
-fi
-t2_log "OK: audio services started"
+t2_log "start-audio" "OK: PipeWire started"
 exit 0
 AUDIOEOF
 sudo chmod +x /usr/local/bin/t2-start-audio.sh
+echo -e "${GREEN}Done${NC}"
+
+# Create 't2-set-default-audio.sh' script
+echo -e "\n${YELLOW}⚙${NC} Creating 't2-set-default-audio.sh' script..."
+sudo tee /usr/local/bin/t2-set-default-audio.sh > /dev/null << 'AUDIOEOF'
+#!/bin/sh
+# T2 Suspend Fix - Set Default Audio Devices
+# Sets default speakers and mic (mainly needed for 16" MacBook with custom DSP)
+
+# Source common library
+if [ -f /usr/local/lib/t2-suspend-fix/common.sh ]; then
+    . /usr/local/lib/t2-suspend-fix/common.sh
+else
+    exit 1
+fi
+
+uid=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $2}' | head -n1)
+if [ -z "$uid" ]; then
+    t2_log "set-default-audio" "SKIP: no user session found"
+    exit 0
+fi
+
+t2_log "set-default-audio" "Looking for audio devices (polling for 5s)..."
+
+# Poll for up to 5s for devices to appear
+for i in $(seq 1 10); do
+    # Try different speaker patterns (16" uses filter-chain, 13" uses Apple Audio Device)
+    T2_SPEAKERS=$(XDG_RUNTIME_DIR="/run/user/$uid" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+        wpctl status 2>/dev/null | grep -F '[Audio/Sink]' | grep -E 'input.filter-chain-speakers|Apple Audio Device Speakers' | sed -n 's/.* \([0-9]\+\)\..*/\1/p' | head -n1)
+    # Try different mic patterns
+    T2_MIC=$(XDG_RUNTIME_DIR="/run/user/$uid" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+        wpctl status 2>/dev/null | grep -F '[Audio/Source]' | grep -E 'output.filter-chain-mic|Apple Audio Device.*Mic' | sed -n 's/.* \([0-9]\+\)\..*/\1/p' | head -n1)
+    if [ -n "$T2_SPEAKERS" ] || [ -n "$T2_MIC" ]; then
+        break
+    fi
+    sleep 0.5
+done
+
+if [ -n "$T2_SPEAKERS" ]; then
+    XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" wpctl set-default "$T2_SPEAKERS" 2>/dev/null
+    t2_log "set-default-audio" "OK: speakers set to $T2_SPEAKERS"
+else
+    t2_log "set-default-audio" "NOTE: speakers not found"
+fi
+
+if [ -n "$T2_MIC" ]; then
+    XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" wpctl set-default "$T2_MIC" 2>/dev/null
+    t2_log "set-default-audio" "OK: mic set to $T2_MIC"
+else
+    t2_log "set-default-audio" "NOTE: mic not found"
+fi
+
+exit 0
+AUDIOEOF
+sudo chmod +x /usr/local/bin/t2-set-default-audio.sh
 echo -e "${GREEN}Done${NC}"
 
 # Create 't2-suspend.sh' script
@@ -720,6 +763,7 @@ fi
 
 # Restart audio
 /usr/local/bin/t2-start-audio.sh
+/usr/local/bin/t2-set-default-audio.sh
 
 # Start user services
 start_service t2fanrd
