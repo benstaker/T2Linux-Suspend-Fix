@@ -24,6 +24,7 @@ t2_log "$LABEL" "Turning off keyboard backlight..."
 # Unload WiFi
 if [ "$HAS_WIFI" = true ]; then
     unload_mod brcmfmac_wcc
+    unload_mod brcmfmac
     unload_mod brcmutil
 fi
 

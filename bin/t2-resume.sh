@@ -23,7 +23,17 @@ fi
 # Load Sensors
 if [ "$HAS_SENSORS" = true ]; then
     load_mod industrialio
+    load_mod industrialio_triggered_buffer
+    load_mod hid_sensor_iio_common
     load_mod hid_sensor_rotation
+    load_mod hid_sensor_als
+fi
+
+# Load Touchbar
+if [ "$HAS_TOUCHBAR" = true ]; then
+    load_mod appletbdrm
+    load_mod hid_appletb_kbd
+    load_mod hid_appletb_bl
 fi
 
 # Load WiFi
