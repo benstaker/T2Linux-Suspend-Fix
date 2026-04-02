@@ -26,6 +26,14 @@ if [ ! -S "/run/user/$uid/bus" ]; then
 fi
 
 username=$(id -nu "$uid" 2>/dev/null) || exit 0
+
+# Check if PipeWire is already running before trying to start
+if XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+    runuser -u "$username" -- systemctl --user is-active pipewire.service >/dev/null 2>&1; then
+    t2_log "start-audio" "SKIP: PipeWire already running for user $username"
+    exit 0
+fi
+
 t2_log "start-audio" "Starting PipeWire for user $username (uid=$uid)..."
 
 XDG_RUNTIME_DIR="/run/user/$uid" \
@@ -33,5 +41,5 @@ DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     runuser -u "$username" -- \
     systemctl --user start pipewire.socket pipewire-pulse.socket 2>/dev/null
 
-t2_log "start-audio" "OK: PipeWire started"
+t2_log "start-audio" "OK: PipeWire started for user $username"
 exit 0
