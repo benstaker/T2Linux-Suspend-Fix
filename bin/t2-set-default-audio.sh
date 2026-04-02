@@ -22,11 +22,11 @@ for i in $(seq 1 10); do
     # Try different speaker patterns (16" uses filter-chain, 13" uses Apple Audio Device)
     T2_SPEAKERS=$(XDG_RUNTIME_DIR="/run/user/$uid" \
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-        wpctl status 2>/dev/null | grep -F '[Audio/Sink]' | grep -E 'input.filter-chain-speakers|Apple Audio Device Speakers' | sed -n 's/.* \([0-9]\+\)\.*/\1/p' | head -n1)
+        wpctl status 2>/dev/null | grep -iE 'input\.filter-chain-speakers|Apple Audio Device Speakers' | sed -n 's/.* \([0-9]\+\)\.*/\1/p' | head -n1)
     # Try different mic patterns
     T2_MIC=$(XDG_RUNTIME_DIR="/run/user/$uid" \
         DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-        wpctl status 2>/dev/null | grep -F '[Audio/Source]' | grep -E 'output.filter-chain-mic|Apple Audio Device.*Mic' | sed -n 's/.* \([0-9]\+\)\.*/\1/p' | head -n1)
+        wpctl status 2>/dev/null | grep -iE 'output\.filter-chain-mic|Apple Audio Device.*Mic' | sed -n 's/.* \([0-9]\+\)\.*/\1/p' | head -n1)
     if [ -n "$T2_SPEAKERS" ] || [ -n "$T2_MIC" ]; then
         break
     fi
