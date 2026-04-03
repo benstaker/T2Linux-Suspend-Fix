@@ -30,6 +30,7 @@ t2_log "$LABEL" "Turning off keyboard backlight..."
 
 # Unload WiFi
 if [ "$HAS_WIFI" = true ]; then
+    /usr/bin/nmcli radio wifi off
     unload_mod brcmfmac_wcc
     unload_mod brcmfmac
     unload_mod brcmutil

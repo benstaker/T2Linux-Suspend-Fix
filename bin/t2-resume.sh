@@ -26,6 +26,7 @@ if [ "$HAS_WIFI" = true ]; then
     load_mod brcmutil
     load_mod brcmfmac
     load_mod brcmfmac_wcc
+    /usr/bin/nmcli radio wifi on
 fi
 
 # Restart audio
