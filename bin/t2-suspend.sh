@@ -15,9 +15,11 @@ LABEL="suspend"
 
 t2_log "$LABEL" "Starting suspend sequence..."
 
-# Stop user services
+# Stop services
 stop_service tiny-dfr
 stop_service t2fanrd
+stop_service NetworkManager
+stop_service upower
 
 # Stop audio
 /usr/local/bin/t2-stop-audio.sh

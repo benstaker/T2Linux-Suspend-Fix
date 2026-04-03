@@ -117,6 +117,7 @@ start_service() {
         return 0
     fi
 
+    systemctl reset-failed "$svc" 2>/dev/null || true
     systemctl start "$svc" --no-block 2>/dev/null || true
 
     for i in $(seq 1 20); do
