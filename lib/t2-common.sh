@@ -63,6 +63,18 @@ check_service_exists() {
     systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}.service"
 }
 
+# Check if a kernel module is loaded
+# Usage: check_mod <module_name> [label]
+check_mod() {
+    local mod="$1"
+    local label="${2:-common}"
+    if lsmod | grep -q "^${mod}"; then
+        t2_log "$label" "$mod is loaded"
+    else
+        t2_log "$label" "$mod is unloaded"
+    fi
+}
+
 # Load kernel module if not already loaded
 # Usage: load_mod <module_name> [label]
 load_mod() {
