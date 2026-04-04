@@ -173,20 +173,6 @@ detect_sensors() {
     echo "false"
 }
 
-# Detect if WiFi modules are available
-detect_wifi() {
-    if lsmod 2>/dev/null | grep -q "^brcm" || [ -d "/sys/module/brcmfmac" ]; then
-        echo "true"
-        return
-    fi
-    # Check if modules are available
-    if modinfo brcmfmac >/dev/null 2>&1; then
-        echo "true"
-        return
-    fi
-    echo "false"
-}
-
 t2_log "hw-detect" "Starting hardware detection..."
 
 # Create config directory
@@ -203,7 +189,6 @@ HAS_TINYDFR=$(detect_tiny_dfr)
 HAS_APPLE_BCE=$(detect_apple_bce)
 HAS_TOUCHBAR=$(detect_touchbar)
 HAS_SENSORS=$(detect_sensors)
-HAS_WIFI=$(detect_wifi)
 EOF
 
 t2_log "hw-detect" "Hardware configuration written to $T2_HARDWARE_CONF"

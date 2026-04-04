@@ -21,13 +21,8 @@ if [ "$HAS_APPLE_BCE" = true ]; then
     /usr/local/bin/t2-wait-lsmod.sh industrialio 10
 fi
 
-# Load WiFi
-if [ "$HAS_WIFI" = true ]; then
-    load_mod brcmutil
-    load_mod brcmfmac
-    load_mod brcmfmac_wcc
-    /usr/bin/nmcli radio wifi on
-fi
+start_service NetworkManager
+start_service t2fanrd
 
 # Restart audio
 /usr/local/bin/t2-start-audio.sh
@@ -45,11 +40,5 @@ if [ "$HAS_GMUX" = true ]; then
     # Correct GMUX backlight
     /usr/local/bin/t2-fix-backlight.sh gmux_backlight 10%
 fi
-
-# Start services
-start_service upower
-start_service NetworkManager
-start_service t2fanrd
-start_service tiny-dfr
 
 t2_log "$LABEL" "Resume complete"

@@ -15,26 +15,13 @@ LABEL="suspend"
 
 t2_log "$LABEL" "Starting suspend sequence..."
 
-# Stop services
 stop_service tiny-dfr
-stop_service t2fanrd
-stop_service NetworkManager
-stop_service upower
 
-# Stop audio
 /usr/local/bin/t2-stop-audio.sh
 
 # Turn off keyboard backlight
 t2_log "$LABEL" "Turning off keyboard backlight..."
 /usr/bin/brightnessctl -sd :white:kbd_backlight set 0 -q 2>/dev/null || true
-
-# Unload WiFi
-if [ "$HAS_WIFI" = true ]; then
-    /usr/bin/nmcli radio wifi off
-    unload_mod brcmfmac_wcc
-    unload_mod brcmfmac
-    unload_mod brcmutil
-fi
 
 # Unload Touchbar
 if [ "$HAS_TOUCHBAR" = true ]; then
@@ -63,5 +50,9 @@ fi
 if [ "$HAS_APPLE_BCE" = true ]; then
     unload_mod apple_bce
 fi
+
+stop_service t2fanrd
+stop_service upower
+stop_service NetworkManager
 
 t2_log "$LABEL" "Suspend complete, ready to sleep"
