@@ -64,39 +64,41 @@ check_service_exists() {
 }
 
 # Load kernel module if not already loaded
-# Usage: load_mod <module_name>
+# Usage: load_mod <module_name> [label]
 load_mod() {
     local mod="$1"
+    local label="${2:-common}"
     if lsmod | grep -q "^${mod}"; then
-        t2_log "resume" "No load needed for $mod"
+        t2_log "$label" "No load needed for $mod"
         return 0
     fi
-    
+
     /usr/bin/modprobe "$mod" 2>/dev/null || true
     if lsmod | grep -q "^${mod}"; then
-        t2_log "resume" "OK: $mod loaded"
+        t2_log "$label" "OK: $mod loaded"
         return 0
     else
-        t2_log "resume" "ERROR: $mod not loaded"
+        t2_log "$label" "ERROR: $mod not loaded"
         return 1
     fi
 }
 
 # Unload kernel module if loaded
-# Usage: unload_mod <module_name>
+# Usage: unload_mod <module_name> [label]
 unload_mod() {
     local mod="$1"
+    local label="${2:-common}"
     if ! lsmod | grep -q "^${mod}"; then
-        t2_log "suspend" "No unload needed for $mod"
+        t2_log "$label" "No unload needed for $mod"
         return 0
     fi
-    
+
     /usr/bin/modprobe -r "$mod" 2>/dev/null || true
     if ! lsmod | grep -q "^${mod}"; then
-        t2_log "suspend" "OK: $mod unloaded"
+        t2_log "$label" "OK: $mod unloaded"
         return 0
     else
-        t2_log "suspend" "ERROR: $mod still loaded"
+        t2_log "$label" "ERROR: $mod still loaded"
         return 1
     fi
 }
@@ -105,7 +107,7 @@ unload_mod() {
 # Usage: start_service <service_name> [label]
 start_service() {
     local svc="$1"
-    local label="${2:-resume}"
+    local label="${2:-common}"
 
     if ! check_service_exists "$svc"; then
         t2_log "$label" "SKIP: $svc not installed"
@@ -136,7 +138,7 @@ start_service() {
 # Usage: stop_service <service_name> [label]
 stop_service() {
     local svc="$1"
-    local label="${2:-suspend}"
+    local label="${2:-common}"
 
     if ! check_service_exists "$svc"; then
         t2_log "$label" "SKIP: $svc not installed"
@@ -177,19 +179,19 @@ load_hardware_config() {
 }
 
 # Set backlight brightness with retry
-# Usage: set_backlight <device> <value>
+# Usage: set_backlight <device> <value> [label]
 # Device examples: ":white:kbd_backlight", "gmux_backlight"
 set_backlight() {
     local device="$1"
     local value="$2"
-    local label="backlight"
-    
+    local label="${3:-common}"
+
     for i in $(seq 1 10); do
         local set_output
         set_output=$(brightnessctl -d "$device" set "$value" 2>&1)
         local current
         current=$(brightnessctl -d "$device" get 2>/dev/null)
-        
+
         case "$set_output" in
             *"$current"*)
                 t2_log "$label" "OK: $device set to $value after $i/10 attempts"
@@ -198,7 +200,7 @@ set_backlight() {
         esac
         sleep 0.5
     done
-    
+
     t2_log "$label" "ERROR: could not set $device after 10 attempts"
     return 1
 }
