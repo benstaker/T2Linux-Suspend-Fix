@@ -10,6 +10,30 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 LOG_FILE="/var/log/t2-suspend-fix.log"
 
+# Usage information
+usage() {
+    cat << EOF
+Usage: $0 [OPTIONS] [MODE]
+
+Modes:
+  install             Install suspend fix (default)
+  uninstall           Uninstall suspend fix
+  install-apple-bce   Install apple-bce driver (no-state-suspend branch)
+  uninstall-apple-bce Uninstall apple-bce driver
+
+Options:
+  -y, --yes           Auto-confirm all prompts
+  -h, --help          Show this help message
+
+Examples:
+  $0                          # Interactive mode selection
+  $0 install                  # Install with confirmation prompt
+  $0 -y install               # Install without confirmation
+  $0 uninstall                # Uninstall with confirmation
+  $0 -y uninstall             # Uninstall without confirmation
+EOF
+}
+
 t2_log() {
     local label="$1"
     shift
@@ -19,43 +43,77 @@ t2_log() {
     echo "[${timestamp}][${label}] ${msg}" | tee -a "$LOG_FILE" 2>/dev/null || true
 }
 
+# Parse arguments
+MODE=""
+AUTO_CONFIRM=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -y|--yes)
+            AUTO_CONFIRM=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        install|uninstall|install-apple-bce|uninstall-apple-bce)
+            MODE="$1"
+            shift
+            ;;
+        -*)
+            echo -e "${RED}Error: Unknown option $1${NC}" >&2
+            usage
+            exit 1
+            ;;
+        *)
+            echo -e "${RED}Error: Unknown argument $1${NC}" >&2
+            usage
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${GREEN}=== T2 MacBook Suspend Fix Installer ===${NC}\n"
 
 # Check if running as root
-if [ "$EUID" -eq 0 ]; then 
+if [ "$EUID" -eq 0 ]; then
     echo -e "${RED}Error: Do not run this script as root. It will use sudo when needed.${NC}"
     exit 1
 fi
 
-# Prompt for mode
-MODE="install"
-echo -e "${YELLOW}Select action:${NC}"
-echo "1) Install suspend fix"
-echo "2) Uninstall suspend fix"
-echo "3) Install apple-bce driver (no-state-suspend branch)"
-echo "4) Uninstall apple-bce driver"
-read -p "Choose [1-4]: " -n 1 -r
-echo
-if [[ $REPLY =~ ^[2]$ ]]; then
-    MODE="uninstall"
-elif [[ $REPLY =~ ^[1]$ ]]; then
-    MODE="install"
-elif [[ $REPLY =~ ^[3]$ ]]; then
-    MODE="install-apple-bce"
-elif [[ $REPLY =~ ^[4]$ ]]; then
-    MODE="uninstall-apple-bce"
-else
-    echo -e "${RED}Invalid selection.${NC}"
-    exit 1
+# Prompt for mode if not specified
+if [ -z "$MODE" ]; then
+    echo -e "${YELLOW}Select action:${NC}"
+    echo "1) Install suspend fix"
+    echo "2) Uninstall suspend fix"
+    echo "3) Install apple-bce driver (no-state-suspend branch)"
+    echo "4) Uninstall apple-bce driver"
+    read -p "Choose [1-4]: " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[2]$ ]]; then
+        MODE="uninstall"
+    elif [[ $REPLY =~ ^[1]$ ]]; then
+        MODE="install"
+    elif [[ $REPLY =~ ^[3]$ ]]; then
+        MODE="install-apple-bce"
+    elif [[ $REPLY =~ ^[4]$ ]]; then
+        MODE="uninstall-apple-bce"
+    else
+        echo -e "${RED}Invalid selection.${NC}"
+        exit 1
+    fi
 fi
 
 if [ "$MODE" = "uninstall" ]; then
-    # Confirm with user
-    read -p "Continue with uninstall? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "  - uninstall cancelled."
-        exit 0
+    # Confirm with user (unless auto-confirmed)
+    if [ "$AUTO_CONFIRM" = false ]; then
+        read -p "Continue with uninstall? (y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "  - uninstall cancelled."
+            exit 0
+        fi
     fi
     echo -e "${YELLOW}⚙${NC} Uninstalling..."
 
@@ -188,13 +246,15 @@ if [ "$MODE" = "install-apple-bce" ]; then
     command -v git >/dev/null 2>&1 || { t2_log "ERROR: git not found"; exit 1; }
     command -v make >/dev/null 2>&1 || { t2_log "ERROR: make not found"; exit 1; }
     command -v nproc >/dev/null 2>&1 || { t2_log "ERROR: nproc not found"; exit 1; }
-    
-    # Confirm with user
-    read -p "Continue with install-apple-bce? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "  - install-apple-bce cancelled."
-        exit 0
+
+    # Confirm with user (unless auto-confirmed)
+    if [ "$AUTO_CONFIRM" = false ]; then
+        read -p "Continue with install-apple-bce? (y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "  - install-apple-bce cancelled."
+            exit 0
+        fi
     fi
     echo -e "${YELLOW}⚙${NC} Installing apple-bce driver (no-state-suspend branch)..."
     
@@ -277,12 +337,14 @@ fi
 
 # Uninstall apple-bce driver
 if [ "$MODE" = "uninstall-apple-bce" ]; then
-    # Confirm with user
-    read -p "Continue with uninstall-apple-bce? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "  - uninstall-apple-bce cancelled."
-        exit 0
+    # Confirm with user (unless auto-confirmed)
+    if [ "$AUTO_CONFIRM" = false ]; then
+        read -p "Continue with uninstall-apple-bce? (y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "  - uninstall-apple-bce cancelled."
+            exit 0
+        fi
     fi
     echo -e "${YELLOW}⚙${NC} Uninstalling apple-bce driver..."
     
@@ -342,12 +404,14 @@ command -v brightnessctl >/dev/null 2>&1 || { t2_log "ERROR: brightnessctl not f
 command -v swayidle >/dev/null 2>&1 || { t2_log "ERROR: swayidle not found"; exit 1; }
 command -v wpctl >/dev/null 2>&1 || { t2_log "ERROR: wpctl not found"; exit 1; }
 
-# Confirm with user
-read -p "Continue with install? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "  - install cancelled."
-    exit 0
+# Confirm with user (unless auto-confirmed)
+if [ "$AUTO_CONFIRM" = false ]; then
+    read -p "Continue with install? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "  - install cancelled."
+        exit 0
+    fi
 fi
 
 # Create log file
